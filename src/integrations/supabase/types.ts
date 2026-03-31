@@ -2303,10 +2303,15 @@ export type Database = {
       profiles: {
         Row: {
           account_status: string
+          account_type: string | null
+          approval_status: string | null
           avatar_url: string | null
+          badges: string[] | null
           batch: string | null
           bio: string | null
+          capabilities: string[] | null
           created_at: string
+          entitlements: string[] | null
           full_name: string | null
           github_url: string | null
           hourly_rate: string | null
@@ -2330,10 +2335,15 @@ export type Database = {
         }
         Insert: {
           account_status?: string
+          account_type?: string | null
+          approval_status?: string | null
           avatar_url?: string | null
+          badges?: string[] | null
           batch?: string | null
           bio?: string | null
+          capabilities?: string[] | null
           created_at?: string
+          entitlements?: string[] | null
           full_name?: string | null
           github_url?: string | null
           hourly_rate?: string | null
@@ -2357,10 +2367,15 @@ export type Database = {
         }
         Update: {
           account_status?: string
+          account_type?: string | null
+          approval_status?: string | null
           avatar_url?: string | null
+          badges?: string[] | null
           batch?: string | null
           bio?: string | null
+          capabilities?: string[] | null
           created_at?: string
+          entitlements?: string[] | null
           full_name?: string | null
           github_url?: string | null
           hourly_rate?: string | null
