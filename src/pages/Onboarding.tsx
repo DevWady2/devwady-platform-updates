@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, type AccountType } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,10 +14,10 @@ import {
   ArrowRight, ArrowLeft, CheckCircle2, Loader2, Sparkles, Camera,
 } from "lucide-react";
 
-type AccountTypeOption = "individual" | "company" | "student" | "expert" | "instructor";
+type OnboardingAccountType = Exclude<AccountType, "admin">;
 
 const accountTypeOptions: {
-  value: AccountTypeOption;
+  value: OnboardingAccountType;
   icon: typeof User;
   titleEn: string;
   titleAr: string;
@@ -28,10 +28,10 @@ const accountTypeOptions: {
   portalLabelAr: string;
 }[] = [
   {
-    value: "individual",
+    value: "freelancer",
     icon: Briefcase,
-    titleEn: "Freelancer / Individual",
-    titleAr: "مستقل / فرد",
+    titleEn: "Freelancer",
+    titleAr: "مستقل",
     descEn: "Get hired, apply to jobs, and showcase your portfolio",
     descAr: "احصل على توظيف، قدم على الوظائف واعرض أعمالك",
     portalPath: "/talent/portal/freelancer",
@@ -88,8 +88,8 @@ export default function Onboarding() {
   const [direction, setDirection] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Role selection
-  const [selectedAccountType, setSelectedAccountType] = useState<AccountTypeOption | null>(null);
+  // Account type selection
+  const [selectedAccountType, setSelectedAccountType] = useState<OnboardingAccountType | null>(null);
 
   // Profile basics
   const [fullName, setFullName] = useState("");
@@ -118,9 +118,8 @@ export default function Onboarding() {
     if (meta?.full_name) setFullName(meta.full_name);
 
     // Single-account model: always skip account type selection, go straight to profile
-    if (existingAccountType) {
-      const legacy = existingAccountType === "freelancer" ? "individual" : existingAccountType;
-      setSelectedAccountType(legacy as AccountTypeOption);
+    if (existingAccountType && existingAccountType !== "admin") {
+      setSelectedAccountType(existingAccountType as OnboardingAccountType);
       setStep(1);
     }
   }, [user, authLoading, existingAccountType]);
@@ -164,7 +163,7 @@ export default function Onboarding() {
   };
 
   const getPortalInfo = () => {
-    const opt = accountTypeOptions.find(r => r.value === selectedAccountType);
+    const opt = accountTypeOptions.find((option) => option.value === selectedAccountType);
     return opt || accountTypeOptions[0];
   };
 
@@ -172,7 +171,7 @@ export default function Onboarding() {
     const info = getPortalInfo();
     // Redirect to account-type-specific onboarding for more detailed setup
     switch (selectedAccountType) {
-      case "individual":
+      case "freelancer":
         navigate("/onboarding/freelancer");
         return;
       case "student":
@@ -232,9 +231,9 @@ export default function Onboarding() {
           </div>
 
           <AnimatePresence mode="wait" custom={direction}>
-            {/* Step 0: Role Selection */}
+            {/* Step 0: Account Type Selection */}
             {step === 0 && (
-              <motion.div key="role" custom={direction} variants={slideVariant} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }} className="bg-card rounded-2xl border p-8 shadow-xl">
+              <motion.div key="account-type" custom={direction} variants={slideVariant} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }} className="bg-card rounded-2xl border p-8 shadow-xl">
                 <div className="text-center mb-6">
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-4">
                     <User className="h-7 w-7 text-primary-foreground" />
@@ -323,7 +322,7 @@ export default function Onboarding() {
                     <label className="text-sm font-medium mb-1.5 block">{isAr ? "نبذة عنك" : "Short Bio"}</label>
                     <Textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} placeholder={isAr ? "أخبرنا عن نفسك..." : "Tell us about yourself..."} />
                   </div>
-                  {(selectedAccountType === "individual" || selectedAccountType === "student") && (
+                  {(selectedAccountType === "freelancer" || selectedAccountType === "student") && (
                     <div>
                       <label className="text-sm font-medium mb-1.5 block">{isAr ? "التخصص" : "Track"}</label>
                       <div className="grid grid-cols-2 gap-2">

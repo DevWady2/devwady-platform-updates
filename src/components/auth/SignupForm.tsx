@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { legacyRoleFromAccountType } from "@/lib/accountType";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,20 +11,20 @@ import { Mail, Lock, User, Building2, GraduationCap, ArrowRight, Loader2, UserPl
 import { toast } from "sonner";
 import { signupFormSchema, extractErrors } from "@/lib/validations";
 
-type SignupRole = "individual" | "company" | "student";
+type SignupAccountType = "freelancer" | "company" | "student";
 
-const roleConfig: Record<SignupRole, { icon: typeof User; labelEn: string; labelAr: string }> = {
-  individual: { icon: User, labelEn: "Freelancer", labelAr: "مستقل" },
+const accountTypeConfig: Record<SignupAccountType, { icon: typeof User; labelEn: string; labelAr: string }> = {
+  freelancer: { icon: User, labelEn: "Freelancer", labelAr: "مستقل" },
   company: { icon: Building2, labelEn: "Company", labelAr: "شركة" },
   student: { icon: GraduationCap, labelEn: "Student", labelAr: "طالب" },
 };
 
 interface SignupFormProps {
-  role: SignupRole;
+  accountType: SignupAccountType;
   redirect?: string;
 }
 
-export default function SignupForm({ role, redirect: _redirect = "" }: SignupFormProps) {
+export default function SignupForm({ accountType, redirect: _redirect = "" }: SignupFormProps) {
   const { signUp } = useAuth();
   const { lang } = useLanguage();
   const navigate = useNavigate();
@@ -38,9 +39,9 @@ export default function SignupForm({ role, redirect: _redirect = "" }: SignupFor
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const config = roleConfig[role];
+  const config = accountTypeConfig[accountType];
   const Icon = config.icon;
-  const isCompany = role === "company";
+  const isCompany = accountType === "company";
 
   const clearFieldError = (field: string) => {
     if (fieldErrors[field]) setFieldErrors((e) => { const n = { ...e }; delete n[field]; return n; });
@@ -76,7 +77,7 @@ export default function SignupForm({ role, redirect: _redirect = "" }: SignupFor
     setFieldErrors({});
     setLoading(true);
 
-    const meta = { full_name: isCompany ? companyName : fullName, account_type: role };
+    const meta = { full_name: isCompany ? companyName : fullName, account_type: accountType };
     const { error: signUpError } = await signUp(email, password, meta);
 
     if (signUpError) {
@@ -87,11 +88,14 @@ export default function SignupForm({ role, redirect: _redirect = "" }: SignupFor
 
     const { data: { user: newUser } } = await supabase.auth.getUser();
     if (newUser) {
-      await supabase.from("user_roles").insert({ user_id: newUser.id, role });
+      const legacyRole = legacyRoleFromAccountType(accountType);
+      if (legacyRole) {
+        await supabase.from("user_roles").insert({ user_id: newUser.id, role: legacyRole });
+      }
       if (isCompany) {
         await supabase.from("company_profiles").insert({ user_id: newUser.id, company_name: companyName });
       }
-    const templateName = isCompany ? "welcome_company" : role === "student" ? "welcome_student" : "welcome_freelancer";
+    const templateName = isCompany ? "welcome_company" : accountType === "student" ? "welcome_student" : "welcome_freelancer";
     supabase.functions.invoke("send-email", {
       body: {
         to: email,

@@ -14,6 +14,10 @@ import type { Database } from "@/integrations/supabase/types";
 
 // ── Shared Core ──────────────────────────────────────────────
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type ProfileAccountType = Profile["account_type"];
+export type ProfileCapability = Profile["capabilities"][number];
+export type AccountTypeMigrationReview = Database["public"]["Tables"]["account_type_migration_reviews"]["Row"];
+
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];
 export type PageView = Database["public"]["Tables"]["page_views"]["Row"];

@@ -66,6 +66,13 @@ export type AppRole = "individual" | "company" | "admin" | "expert" | "student" 
 
 export type AccountStatus = "pending_verification" | "pending_approval" | "active" | "suspended" | "banned" | "deactivated";
 
+export type Capability =
+  | "browse_courses" | "enroll_courses" | "apply_jobs" | "post_jobs"
+  | "receive_hires" | "build_portfolio" | "request_services"
+  | "create_courses" | "give_consultations" | "book_consultations"
+  | "track_projects" | "manage_team" | "earn_from_platform"
+  | "admin_backoffice";
+
 /** Map legacy AppRole ↔ canonical AccountType */
 export function toAccountType(role: AppRole): AccountType {
   return role === "individual" ? "freelancer" : role;

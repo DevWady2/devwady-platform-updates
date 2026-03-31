@@ -1,27 +1,29 @@
 import { Link } from "react-router-dom";
 import { useProfileCompleteness } from "@/hooks/useProfileCompleteness";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, type AccountType, legacyRoleFrom } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const editPaths: Record<string, string> = {
+const editPaths: Record<AccountType, string> = {
   company: "/company/profile",
   expert: "/expert/profile",
   instructor: "/profile/edit",
   student: "/profile/edit",
-  individual: "/profile/edit",
+  freelancer: "/profile/edit",
+  admin: "/profile/edit",
 };
 
 export default function ProfileCompletenessBanner() {
-  const { user, role } = useAuth();
+  const { user, accountType } = useAuth();
   const { lang } = useLanguage();
-  const { percentage, nextStep, loading } = useProfileCompleteness();
+  const completenessRole = accountType ? legacyRoleFrom(accountType) : undefined;
+  const { percentage, nextStep, loading } = useProfileCompleteness(completenessRole);
   const isAr = lang === "ar";
 
   if (!user || loading || percentage >= 100) return null;
 
-  const editPath = editPaths[role ?? "individual"] ?? "/profile/edit";
+  const editPath = accountType ? editPaths[accountType] ?? "/profile/edit" : "/profile/edit";
 
   return (
     <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 mb-6">

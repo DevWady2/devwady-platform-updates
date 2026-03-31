@@ -28,7 +28,7 @@ const fadeUp = {
 
 export default function Hiring() {
   const { lang, t } = useLanguage();
-  const { user, role } = useAuth();
+  const { user, accountType, role } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const isAr = lang === "ar";
@@ -109,7 +109,7 @@ export default function Hiring() {
   // Current user's applications (to show "Applied" badge)
   const { data: myApplications = [] } = useQuery({
     queryKey: ["my-job-applications", user?.id],
-    enabled: !!user && role === "individual",
+    enabled: !!user && (accountType === "freelancer" || (!accountType && role === "individual")),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("job_applications")
@@ -123,7 +123,7 @@ export default function Hiring() {
   // Company shortlists
   const { data: myShortlists = [] } = useQuery({
     queryKey: ["my-shortlists", user?.id],
-    enabled: !!user && role === "company",
+    enabled: !!user && (accountType === "company" || (!accountType && role === "company")),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("freelancer_shortlists")

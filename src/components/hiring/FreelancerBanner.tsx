@@ -14,7 +14,7 @@ import { FileText, FolderOpen, User } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function FreelancerBanner() {
-  const { user, role } = useAuth();
+  const { user, accountType, role } = useAuth();
   const { lang } = useLanguage();
   const isAr = lang === "ar";
   const { score, loading: scoreLoading } = useProfileCompleteness();
@@ -60,7 +60,7 @@ export default function FreelancerBanner() {
   });
 
   // Only show for logged-in freelancers
-  if (!user || role !== "individual") return null;
+  if (!user || (accountType !== "freelancer" && !(accountType === null && role === "individual"))) return null;
 
   return (
     <motion.div

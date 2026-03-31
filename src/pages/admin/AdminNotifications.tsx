@@ -287,8 +287,11 @@ export default function AdminNotifications() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("admin.allUsers")}</SelectItem>
-                    <SelectItem value="individuals">{t("admin.allIndividuals")}</SelectItem>
+                    <SelectItem value="freelancers">{lang === "ar" ? "كل المستقلين" : "All freelancers"}</SelectItem>
                     <SelectItem value="companies">{t("admin.allCompanies")}</SelectItem>
+                    <SelectItem value="experts">{lang === "ar" ? "كل الخبراء" : "All experts"}</SelectItem>
+                    <SelectItem value="students">{lang === "ar" ? "كل الطلاب" : "All students"}</SelectItem>
+                    <SelectItem value="instructors">{lang === "ar" ? "كل المدربين" : "All instructors"}</SelectItem>
                     <SelectItem value="admins">{t("admin.allAdmins")}</SelectItem>
                   </SelectContent>
                 </Select>

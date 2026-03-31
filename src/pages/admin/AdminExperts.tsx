@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import ExpertFormDialog, { type ExpertFormData } from "@/components/admin/ExpertFormDialog";
 import { dayNames } from "@/data/consultingData";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getAccountTypeLabel, normalizeAccountType } from "@/lib/accountType";
 
 export default function AdminExperts() {
   const { t, lang } = useLanguage();
@@ -57,12 +58,13 @@ export default function AdminExperts() {
       return data as any[];
     } });
 
-  const filteredUsers = linkSearch.trim()
+  const filteredUsers = (linkSearch.trim()
     ? allUsers.filter((u: any) => {
         const q = linkSearch.toLowerCase();
         return (u.email?.toLowerCase().includes(q) || u.full_name?.toLowerCase().includes(q));
       })
-    : allUsers;
+    : allUsers
+  ).sort((a: any, b: any) => Number(normalizeAccountType(b.account_type) === "expert") - Number(normalizeAccountType(a.account_type) === "expert"));
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -173,7 +175,7 @@ export default function AdminExperts() {
         <TableHeader>
           <TableRow>
             <TableHead>{t("admin.expert")}</TableHead>
-            <TableHead className="hidden md:table-cell">{t("admin.role")}</TableHead>
+            <TableHead className="hidden md:table-cell">{lang === "ar" ? "نوع الحساب" : "Account Type"}</TableHead>
             <TableHead className="hidden sm:table-cell">{t("admin.track")}</TableHead>
             <TableHead className="hidden lg:table-cell">{t("admin.rate")}</TableHead>
             <TableHead className="hidden lg:table-cell">Account</TableHead>
@@ -195,7 +197,7 @@ export default function AdminExperts() {
                     <div><div className="font-medium">{exp.name}</div><div className="text-xs text-muted-foreground">{exp.email || "—"}</div></div>
                   </div>
                 </TableCell>
-                <TableCell className="hidden md:table-cell text-muted-foreground">{exp.role}</TableCell>
+                <TableCell className="hidden md:table-cell text-muted-foreground">{getAccountTypeLabel("expert", lang as "en" | "ar")}</TableCell>
                 <TableCell className="hidden sm:table-cell"><Badge variant="secondary" className="text-xs">{exp.track}</Badge></TableCell>
                 <TableCell className="hidden lg:table-cell">${exp.session_rate_usd}</TableCell>
                 <TableCell className="hidden lg:table-cell">
@@ -322,7 +324,7 @@ export default function AdminExperts() {
                       <div className="font-medium text-sm truncate">{u.full_name || "—"}</div>
                       <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                     </div>
-                    {u.role && <Badge variant="secondary" className="text-xs">{u.role}</Badge>}
+                    {getAccountTypeLabel(u.account_type || u.role, lang as "en" | "ar") && <Badge variant="secondary" className="text-xs">{getAccountTypeLabel(u.account_type || u.role, lang as "en" | "ar")}</Badge>}
                   </button>
                 ))}
               </div>

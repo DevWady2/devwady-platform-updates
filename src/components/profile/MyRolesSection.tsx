@@ -1,4 +1,4 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { legacyRoleFrom, useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useProfileCompleteness } from "@/hooks/useProfileCompleteness";
 import { Badge } from "@/components/ui/badge";
@@ -47,10 +47,10 @@ function MiniRing({ percentage, size = 36 }: { percentage: number; size?: number
 }
 
 export default function MyRolesSection() {
-  const { accountType, role } = useAuth();
+  const { accountType } = useAuth();
   const { lang } = useLanguage();
-  // Pass legacy role for profile completeness hook compatibility
-  const { percentage, loading } = useProfileCompleteness(role ?? undefined);
+  const completenessRole = accountType ? legacyRoleFrom(accountType) : undefined;
+  const { percentage, loading } = useProfileCompleteness(completenessRole);
 
   if (!accountType) return null;
 
@@ -59,7 +59,7 @@ export default function MyRolesSection() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="bg-card rounded-2xl border border-border p-6">
-      <h2 className="font-bold text-lg mb-4">{t(lang, "My Account", "حسابي")}</h2>
+      <h2 className="font-bold text-lg mb-4">{t(lang, "Account Type", "نوع الحساب")}</h2>
       <div className="flex flex-wrap gap-3">
         <div className="bg-card rounded-xl border border-border p-4 flex flex-col items-center gap-3 min-w-[140px]">
           <div className="flex items-center gap-2">

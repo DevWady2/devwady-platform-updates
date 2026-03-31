@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildAccountTypeConflictPayload, ensureCanonicalProfile, isAdminUser, syncLegacyRoleBridge } from "../_shared/account-identity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,10 +47,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     // Also allow if caller IS the company_user_id with owner role, or is platform admin
-    const { data: isAdmin } = await adminClient.rpc("has_role", {
-      _user_id: caller.id,
-      _role: "admin",
-    });
+    const isAdmin = await isAdminUser(adminClient, caller.id);
 
     if (!isAdmin && (!callerTeam || !["owner", "admin"].includes(callerTeam.role))) {
       return new Response(JSON.stringify({ error: "Only company owners or admins can invite team members" }), {
@@ -83,6 +81,7 @@ Deno.serve(async (req) => {
     );
 
     let memberUserId: string;
+    let resolvedAccountType: string | null = "company";
 
     if (existingUser) {
       memberUserId = existingUser.id;
@@ -101,6 +100,17 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      const canonicalProfile = await ensureCanonicalProfile(adminClient, memberUserId, "company");
+      resolvedAccountType = canonicalProfile.resolvedAccountType || resolvedAccountType;
+      if (canonicalProfile.conflict) {
+        return new Response(JSON.stringify(buildAccountTypeConflictPayload(canonicalProfile)), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await syncLegacyRoleBridge(adminClient, memberUserId, "company");
 
       // Add to team
       await adminClient.from("company_team_members").insert({
@@ -138,11 +148,16 @@ Deno.serve(async (req) => {
 
       memberUserId = newUser.user.id;
 
-      // Add company role
-      await adminClient.from("user_roles").insert({
-        user_id: memberUserId,
-        role: "company",
-      });
+      const canonicalProfile = await ensureCanonicalProfile(adminClient, memberUserId, "company");
+      resolvedAccountType = canonicalProfile.resolvedAccountType || resolvedAccountType;
+      if (canonicalProfile.conflict) {
+        return new Response(JSON.stringify(buildAccountTypeConflictPayload(canonicalProfile)), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await syncLegacyRoleBridge(adminClient, memberUserId, "company");
 
       // Add to team
       await adminClient.from("company_team_members").insert({
@@ -161,7 +176,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, member_user_id: memberUserId }), {
+    return new Response(JSON.stringify({
+      success: true,
+      member_user_id: memberUserId,
+      account_type: resolvedAccountType,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

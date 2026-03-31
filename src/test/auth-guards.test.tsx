@@ -48,13 +48,62 @@ describe('auth and portal guards', () => {
     expect(screen.getByTestId('account-status-gate')).toHaveTextContent('Secure Area');
   });
 
-  it('RoleGuard redirects users with the wrong role', async () => {
-    mockUseAuth.mockReturnValue({ role: 'individual', loading: false });
+  it('RoleGuard prefers canonical accountType for access decisions', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'u1' },
+      loading: false,
+      accountType: 'admin',
+      capabilities: [],
+      role: 'admin',
+      roles: ['admin'],
+    });
+
+    render(
+      <MemoryRouter>
+        <RoleGuard allowedAccountTypes={['admin']}>
+          <div>Admin Only</div>
+        </RoleGuard>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Admin Only')).toBeInTheDocument();
+  });
+
+  it('RoleGuard still honors the legacy role shim when canonical identity is unavailable', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'u1' },
+      loading: false,
+      accountType: null,
+      capabilities: [],
+      role: 'admin',
+      roles: ['admin'],
+    });
+
+    render(
+      <MemoryRouter>
+        <RoleGuard allowedRoles={['admin']}>
+          <div>Admin Only</div>
+        </RoleGuard>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Admin Only')).toBeInTheDocument();
+  });
+
+  it('RoleGuard denies access when canonical identity does not match', async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'u1' },
+      loading: false,
+      accountType: 'freelancer',
+      capabilities: [],
+      role: 'individual',
+      roles: ['individual'],
+    });
 
     render(
       <MemoryRouter initialEntries={['/admin']}>
         <Routes>
-          <Route path="/admin" element={<RoleGuard allowedRoles={['admin']}><div>Admin Only</div></RoleGuard>} />
+          <Route path="/admin" element={<RoleGuard allowedAccountTypes={['admin']}><div>Admin Only</div></RoleGuard>} />
           <Route path="/" element={<div>Home Page</div>} />
         </Routes>
       </MemoryRouter>,
@@ -64,7 +113,7 @@ describe('auth and portal guards', () => {
   });
 
   it('PortalGuard redirects to login when the portal requires auth and there is no user', async () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false, roles: [] });
+    mockUseAuth.mockReturnValue({ user: null, loading: false, accountType: null, capabilities: [], roles: [] });
 
     render(
       <MemoryRouter initialEntries={['/enterprise/portal']}>
@@ -81,8 +130,8 @@ describe('auth and portal guards', () => {
     expect(await screen.findByText('Login Page')).toBeInTheDocument();
   });
 
-  it('PortalGuard redirects authenticated users without allowed roles to home', async () => {
-    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, roles: ['company'] });
+  it('PortalGuard redirects authenticated users without allowed account access to home', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, accountType: 'company', capabilities: [], role: 'company', roles: ['company'] });
 
     render(
       <MemoryRouter initialEntries={['/admin']}>
@@ -96,8 +145,8 @@ describe('auth and portal guards', () => {
     expect(await screen.findByText('Home Page')).toBeInTheDocument();
   });
 
-  it('PortalGuard allows authenticated users with access and wraps them in AccountStatusGate', () => {
-    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, roles: ['admin'] });
+  it('PortalGuard allows authenticated users with canonical account access and wraps them in AccountStatusGate', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, accountType: 'admin', capabilities: ['admin_backoffice'], role: 'admin', roles: ['admin'] });
 
     render(
       <MemoryRouter>

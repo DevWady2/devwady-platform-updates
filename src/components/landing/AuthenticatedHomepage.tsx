@@ -30,17 +30,18 @@ const fadeUp = {
   }),
 };
 
-const ROLE_GREETING: Record<string, { subtitle_en: string; subtitle_ar: string }> = {
-  company:    { subtitle_en: "Here's what needs your attention today.", subtitle_ar: "إليك ما يحتاج اهتمامك اليوم." },
-  individual: { subtitle_en: "Here's what's new for you.", subtitle_ar: "إليك آخر المستجدات." },
-  expert:     { subtitle_en: "Here's your consulting overview.", subtitle_ar: "إليك نظرة على استشاراتك." },
-  student:    { subtitle_en: "Ready to continue learning?", subtitle_ar: "مستعد لمتابعة التعلم؟" },
+const ACCOUNT_GREETING: Record<string, { subtitle_en: string; subtitle_ar: string }> = {
+  company: { subtitle_en: "Here's what needs your attention today.", subtitle_ar: "إليك ما يحتاج اهتمامك اليوم." },
+  freelancer: { subtitle_en: "Here's what's new for you.", subtitle_ar: "إليك آخر المستجدات." },
+  expert: { subtitle_en: "Here's your consulting overview.", subtitle_ar: "إليك نظرة على استشاراتك." },
+  student: { subtitle_en: "Ready to continue learning?", subtitle_ar: "مستعد لمتابعة التعلم؟" },
   instructor: { subtitle_en: "Here's your teaching & specialization overview.", subtitle_ar: "إليك نظرة على تدريسك وتخصصك." },
+  admin: { subtitle_en: "Here's your platform overview.", subtitle_ar: "إليك نظرة عامة على المنصة." },
 };
 
 export default function AuthenticatedHomepage() {
   const { lang } = useLanguage();
-  const { user, role, roles } = useAuth();
+  const { user, accountType } = useAuth();
   const isAr = lang === "ar";
 
   const { data: profile } = useQuery({
@@ -53,32 +54,33 @@ export default function AuthenticatedHomepage() {
     },
   });
 
-  const effectiveRole = role ?? "individual";
-  const greeting = ROLE_GREETING[effectiveRole] ?? ROLE_GREETING.individual;
+  const currentAccountType = accountType;
+  const greeting = currentAccountType ? (ACCOUNT_GREETING[currentAccountType] ?? ACCOUNT_GREETING.freelancer) : ACCOUNT_GREETING.freelancer;
   const firstName = profile?.full_name?.split(" ")[0] ?? "";
-  const isInstructor = effectiveRole === "instructor";
-  const isStudent = effectiveRole === "student";
+  const isInstructor = currentAccountType === "instructor";
+  const isStudent = currentAccountType === "student";
 
-  /* primary workspace per role */
+  /* primary workspace per account type */
   const PRIMARY_WORKSPACE: Record<string, string> = {
     company: "/enterprise/portal",
-    individual: "/talent/portal",
+    freelancer: "/talent/portal/freelancer",
     expert: "/consulting/portal",
     student: "/academy/portal",
     instructor: "/instructor/workspace",
+    admin: "/admin",
   };
-  const primaryPath = PRIMARY_WORKSPACE[effectiveRole];
+  const primaryPath = currentAccountType ? PRIMARY_WORKSPACE[currentAccountType] : undefined;
 
-  /* workspace shortcuts — only portals the user has access to */
+  /* workspace shortcuts — only portals the account type can access */
   const portalCards = [
-    { path: "/enterprise/portal", label_en: "Enterprise", label_ar: "إنتربرايز", icon: Rocket, gradient: "from-primary to-primary/60", desc_en: "Projects & delivery", desc_ar: "المشاريع والتسليم", roles: ["company", "admin"] },
-    { path: "/talent/portal", label_en: "Talent", label_ar: "تالنت", icon: Users, gradient: "from-accent to-accent/60", desc_en: "Hiring & opportunities", desc_ar: "التوظيف والفرص", roles: ["individual", "company", "admin"] },
-    { path: "/consulting/portal", label_en: "Consulting", label_ar: "الاستشارات", icon: Lightbulb, gradient: "from-primary to-accent", desc_en: "Expert sessions", desc_ar: "جلسات الخبراء", roles: ["expert", "individual", "company", "admin"] },
-    { path: "/academy/portal", label_en: "Academy", label_ar: "الأكاديمية", icon: GraduationCap, gradient: "from-secondary to-secondary/60", desc_en: "Courses & learning", desc_ar: "الدورات والتعلم", roles: ["student", "admin"] },
-    { path: "/instructor/workspace", label_en: "Instructor", label_ar: "المدرب", icon: BookOpen, gradient: "from-amber-500 to-amber-400", desc_en: "Teaching & courses", desc_ar: "التدريس والدورات", roles: ["instructor"] },
-  ].filter(p => p.roles.some(r => roles.includes(r as any)));
+    { path: "/enterprise/portal", label_en: "Enterprise", label_ar: "إنتربرايز", icon: Rocket, gradient: "from-primary to-primary/60", desc_en: "Projects & delivery", desc_ar: "المشاريع والتسليم", accountTypes: ["company", "admin"] },
+    { path: currentAccountType === "freelancer" ? "/talent/portal/freelancer" : "/talent/portal", label_en: "Talent", label_ar: "تالنت", icon: Users, gradient: "from-accent to-accent/60", desc_en: "Hiring & opportunities", desc_ar: "التوظيف والفرص", accountTypes: ["freelancer", "company", "admin"] },
+    { path: "/consulting/portal", label_en: "Consulting", label_ar: "الاستشارات", icon: Lightbulb, gradient: "from-primary to-accent", desc_en: "Expert sessions", desc_ar: "جلسات الخبراء", accountTypes: ["expert", "freelancer", "company", "admin"] },
+    { path: "/academy/portal", label_en: "Academy", label_ar: "الأكاديمية", icon: GraduationCap, gradient: "from-secondary to-secondary/60", desc_en: "Courses & learning", desc_ar: "الدورات والتعلم", accountTypes: ["student", "admin"] },
+    { path: "/instructor/workspace", label_en: "Instructor", label_ar: "المدرب", icon: BookOpen, gradient: "from-amber-500 to-amber-400", desc_en: "Teaching & courses", desc_ar: "التدريس والدورات", accountTypes: ["instructor"] },
+  ].filter((portal) => currentAccountType ? portal.accountTypes.includes(currentAccountType as any) : false);
 
-  /* ── Workspace shortcuts block (shared — legacy roles only) ── */
+  /* ── Workspace shortcuts block (shared) ── */
   const workspaceShortcuts = portalCards.length > 0 && (
     <motion.div initial="hidden" animate="visible" className="section-gap-lg">
       <motion.div variants={fadeUp} custom={0} className="section-header">
@@ -139,7 +141,7 @@ export default function AuthenticatedHomepage() {
   if (isStudent) return <StudentHomeLayout header={compactHeader} />;
 
   /* ═══════════════════════════════════════════════════════════════════════════
-   * LEGACY LAYOUT — company / expert / individual / other
+   * SHARED LAYOUT — company / expert / freelancer / admin / other
    * ═══════════════════════════════════════════════════════════════════════════ */
   const legacyHeader = (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mb-4">

@@ -9,9 +9,6 @@ export const downloadCSVMock = vi.fn();
 
 const queryMap = new Map<string, any>();
 
-// NOTE: vi.mock calls must be in each test file, not here.
-// This file only exports helpers, mock references, and render utilities.
-
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSearch } from "@/core/hooks";
@@ -27,6 +24,11 @@ export const mockUseInstructorCourses = vi.mocked(useInstructorCourses);
 export const mockUseQuery = vi.mocked(useQuery);
 export const mockUseMutation = vi.mocked(useMutation);
 
+function legacyRoleFromAccountType(accountType: string | null) {
+  if (accountType === "freelancer") return "individual";
+  return accountType;
+}
+
 export function resetAcademyTestMocks() {
   vi.clearAllMocks();
   queryMap.clear();
@@ -34,14 +36,34 @@ export function resetAcademyTestMocks() {
   mutationMutateMock.mockReset();
   downloadCSVMock.mockReset();
 
+  const accountType = "student";
+  const role = legacyRoleFromAccountType(accountType);
+
   mockUseAuth.mockReturnValue({
     user: { id: "user-1", email: "user@example.com" },
     session: null,
     loading: false,
-    role: "student",
-    roles: ["student"],
+    accountType,
+    role,
+    roles: role ? [role] : [],
+    capabilities: ["browse_courses", "enroll_courses"],
     accountStatus: "active",
+    approvalStatus: "approved",
+    badges: [],
+    entitlements: [],
     isEmailVerified: true,
+    hasCapability: vi.fn((cap: string) => ["browse_courses", "enroll_courses"].includes(cap)),
+    signUp: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    resetPassword: vi.fn(),
+    updatePassword: vi.fn(),
+    switchRole: vi.fn(async () => {
+      throw new Error("Role switching is disabled. The platform now uses a single canonical account model.");
+    }),
+    addRole: vi.fn(async () => ({
+      error: new Error("Adding roles is disabled. The platform now uses a single canonical account model."),
+    })),
   } as any);
 
   mockUseLanguage.mockReturnValue({

@@ -29,6 +29,21 @@ export function legacyRoleFrom(accountType: AccountType): AppRole {
   return accountType;
 }
 
+
+function normalizeAccountType(value: string | null | undefined): AccountType | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === "individual") return "freelancer";
+  if (["freelancer", "company", "admin", "expert", "student", "instructor"].includes(normalized)) {
+    return normalized as AccountType;
+  }
+  return null;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 const DEFAULT_CAPABILITIES: Record<AccountType, Capability[]> = {
   freelancer: ["browse_courses", "enroll_courses", "apply_jobs", "receive_hires", "build_portfolio", "request_services", "book_consultations", "track_projects", "earn_from_platform"],
   company: ["browse_courses", "enroll_courses", "post_jobs", "request_services", "book_consultations", "track_projects", "manage_team"],
@@ -80,21 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
+  const [capabilities, setCapabilities] = useState<Capability[]>([]);
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus | null>(null);
+  const [badges, setBadges] = useState<string[]>([]);
+  const [entitlements, setEntitlements] = useState<string[]>([]);
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
   const queryClient = useQueryClient();
 
-  // Canonical fields derived from legacy role
-  const accountType: AccountType | null = role ? accountTypeFrom(role) : null;
-  const capabilities: Capability[] = accountType ? (DEFAULT_CAPABILITIES[accountType] ?? []) : [];
-  const approvalStatus: ApprovalStatus | null = accountStatus === "pending_approval"
-    ? "pending_review"
-    : (accountStatus === "active" && accountType)
-      ? "approved"
-      : null;
-  const badges: string[] = [];
-  const entitlements: string[] = [];
+  const role: AppRole | null = accountType ? legacyRoleFrom(accountType) : null;
+  const roles: AppRole[] = role ? [role] : [];
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -103,8 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setTimeout(() => fetchRoleAndStatus(session.user.id), 0);
       } else {
-        setRole(null);
-        setRoles([]);
+        setAccountType(null);
+        setCapabilities([]);
+        setApprovalStatus(null);
+        setBadges([]);
+        setEntitlements([]);
         setAccountStatus(null);
       }
     });
@@ -121,27 +134,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchRoleAndStatus = async (userId: string): Promise<{ primaryRole: AppRole | null; roleList: AppRole[]; accountStatus: AccountStatus }> => {
-    const [rolesResult, profileResult] = await Promise.all([
-      supabase
+  const fetchRoleAndStatus = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("account_status, account_type, capabilities, approval_status, badges, entitlements")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const canonicalFromProfile = normalizeAccountType(profile?.account_type);
+
+    let fallbackPrimaryRole: AppRole | null = null;
+    if (!canonicalFromProfile) {
+      const { data: roleRows } = await supabase
         .from("user_roles")
         .select("role, is_primary")
         .eq("user_id", userId)
-        .order("is_primary", { ascending: false }),
-      supabase.from("profiles").select("account_status").eq("user_id", userId).maybeSingle(),
-    ]);
+        .order("is_primary", { ascending: false });
 
-    const allRoles = (rolesResult.data ?? []) as { role: AppRole; is_primary: boolean }[];
-    const roleList = allRoles.map((r) => r.role);
-    const primaryRole = allRoles.find((r) => r.is_primary)?.role ?? roleList[0] ?? null;
-    const status = (profileResult.data?.account_status as AccountStatus) ?? "active";
+      const allRoles = (roleRows ?? []) as { role: AppRole; is_primary: boolean }[];
+      const roleList = allRoles.map((r) => r.role);
+      fallbackPrimaryRole = allRoles.find((r) => r.is_primary)?.role ?? roleList[0] ?? null;
+    }
 
-    // Single-account shim: expose only the primary role
-    setRoles(primaryRole ? [primaryRole] : []);
-    setRole(primaryRole);
+    const canonicalAccountType = canonicalFromProfile ?? (fallbackPrimaryRole ? accountTypeFrom(fallbackPrimaryRole) : null);
+    const status = (profile?.account_status as AccountStatus) ?? "active";
+    const canonicalCapabilities = normalizeStringArray(profile?.capabilities) as Capability[];
+    const resolvedCapabilities = canonicalCapabilities.length > 0
+      ? canonicalCapabilities
+      : (canonicalAccountType ? (DEFAULT_CAPABILITIES[canonicalAccountType] ?? []) : []);
+    const resolvedApprovalStatus = (profile?.approval_status as ApprovalStatus | null) ?? (
+      status === "pending_approval"
+        ? "pending_review"
+        : (status === "active" && canonicalAccountType)
+          ? "approved"
+          : null
+    );
+
+    setAccountType(canonicalAccountType);
+    setCapabilities(resolvedCapabilities);
+    setApprovalStatus(resolvedApprovalStatus);
+    setBadges(normalizeStringArray(profile?.badges));
+    setEntitlements(normalizeStringArray(profile?.entitlements));
     setAccountStatus(status);
-
-    return { primaryRole, roleList, accountStatus: status };
   };
 
   const isEmailVerified = Boolean(user?.email_confirmed_at);
@@ -163,8 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     queryClient.clear();
-    setRole(null);
-    setRoles([]);
+    setAccountType(null);
+    setCapabilities([]);
+    setApprovalStatus(null);
+    setBadges([]);
+    setEntitlements([]);
     setAccountStatus(null);
   };
 

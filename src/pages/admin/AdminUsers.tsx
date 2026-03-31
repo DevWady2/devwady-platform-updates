@@ -14,15 +14,26 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { getAccountTypeLabel, legacyRoleFromAccountType, normalizeAccountType, type CanonicalAccountType } from "@/lib/accountType";
 
 interface UserRecord {
   id: string; email: string; created_at: string; last_sign_in_at: string | null;
   email_confirmed_at: string | null; full_name: string | null; avatar_url: string | null;
-  role: "individual" | "company" | "admin" | "expert" | "instructor" | "student" | null; role_id: string | null;
+  account_type: CanonicalAccountType | null;
+  capabilities: string[];
+  approval_status: string | null;
+  badges: unknown;
+  entitlements: unknown;
+  role: "individual" | "company" | "admin" | "expert" | "instructor" | "student" | null;
+  roles?: string[];
+  role_id: string | null;
   account_status: string; status_reason: string | null; status_changed_at: string | null; status_changed_by: string | null;
 }
 
 const PAGE_SIZE = 20;
+
+const resolveUserAccountType = (user: Pick<UserRecord, "account_type" | "role">) => normalizeAccountType(user.account_type) ?? normalizeAccountType(user.role);
+const countValue = (value: unknown) => Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.keys(value as Record<string, unknown>).length : 0;
 
 const statusConfig: Record<string, { label_en: string; label_ar: string; color: string }> = {
   active: { label_en: "Active", label_ar: "نشط", color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/20" },
@@ -35,10 +46,10 @@ const statusConfig: Record<string, { label_en: string; label_ar: string; color: 
 export default function AdminUsers() {
   const { t, lang } = useLanguage();
 
-  const roleConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  const accountTypeConfig: Record<CanonicalAccountType, { label: string; color: string; icon: React.ElementType }> = {
     admin: { label: t("admin.administrator"), color: "bg-red-500/15 text-red-600 border-red-500/20", icon: ShieldCheck },
     company: { label: "Company", color: "bg-blue-500/15 text-blue-600 border-blue-500/20", icon: Shield },
-    individual: { label: "Individual", color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/20", icon: UserCircle },
+    freelancer: { label: lang === "ar" ? "مستقل" : "Freelancer", color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/20", icon: UserCircle },
     expert: { label: "Expert", color: "bg-purple-500/15 text-purple-600 border-purple-500/20", icon: ShieldCheck },
     instructor: { label: "Instructor", color: "bg-teal-500/15 text-teal-600 border-teal-500/20", icon: ShieldCheck },
     student: { label: "Student", color: "bg-cyan-500/15 text-cyan-600 border-cyan-500/20", icon: UserCircle } };
@@ -70,7 +81,8 @@ export default function AdminUsers() {
   const pendingCount = useMemo(() => users.filter(u => u.account_status === "pending_approval").length, [users]);
 
   const filtered = useMemo(() => users.filter((u) => {
-    if (filterRole !== "all" && (filterRole === "none" ? u.role !== null : u.role !== filterRole)) return false;
+    const resolvedAccountType = resolveUserAccountType(u);
+    if (filterRole !== "all" && (filterRole === "none" ? resolvedAccountType !== null : resolvedAccountType !== filterRole)) return false;
     if (filterStatus !== "all" && u.account_status !== filterStatus) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -80,19 +92,40 @@ export default function AdminUsers() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = useMemo(() => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filtered, page]);
 
-  const assignRole = useCallback(async (userId: string, newRole: string) => {
+  const assignAccountType = useCallback(async (userId: string, newAccountType: string) => {
+    if (newAccountType === "unresolved") return;
     setUpdatingRole(true);
     try {
-      const user = users.find((u) => u.id === userId);
-      if (newRole === "none") { if (user?.role_id) { const { error } = await supabase.from("user_roles").delete().eq("id", user.role_id); if (error) throw error; } }
-      else if (user?.role_id) { const { error } = await supabase.from("user_roles").update({ role: newRole as any }).eq("id", user.role_id); if (error) throw error; }
-      else { const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as any }); if (error) throw error; }
-      toast.success(`${t("admin.role")}: ${newRole}`);
-      setUsers(prev => prev.map(u => u.id !== userId ? u : { ...u, role: newRole === "none" ? null : newRole as any }));
-      if (selected?.id === userId) setSelected(prev => prev ? { ...prev, role: newRole === "none" ? null : newRole as any } : null);
+      const { data, error } = await supabase.functions.invoke("manage-account", {
+        body: { user_id: userId, account_type: newAccountType },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const canonicalAccountType = normalizeAccountType(newAccountType);
+      const compatibilityRole = legacyRoleFromAccountType(canonicalAccountType);
+      toast.success(`${lang === "ar" ? "نوع الحساب" : "Account type"}: ${getAccountTypeLabel(canonicalAccountType, lang as "en" | "ar") ?? newAccountType}`);
+      setUsers(prev => prev.map(u => u.id !== userId ? u : {
+        ...u,
+        account_type: canonicalAccountType,
+        role: compatibilityRole as UserRecord["role"],
+        roles: compatibilityRole ? [compatibilityRole] : [],
+        capabilities: Array.isArray(data?.capabilities) ? data.capabilities : u.capabilities,
+        approval_status: data?.approval_status ?? u.approval_status,
+      }));
+      if (selected?.id === userId) {
+        setSelected(prev => prev ? {
+          ...prev,
+          account_type: canonicalAccountType,
+          role: compatibilityRole as UserRecord["role"],
+          roles: compatibilityRole ? [compatibilityRole] : [],
+          capabilities: Array.isArray(data?.capabilities) ? data.capabilities : prev.capabilities,
+          approval_status: data?.approval_status ?? prev.approval_status,
+        } : null);
+      }
     } catch (err: any) { toast.error(err.message || "Failed"); }
     setUpdatingRole(false);
-  }, [users, selected, t]);
+  }, [selected, lang]);
 
   const executeAccountAction = useCallback(async (action: string, userId: string, reason?: string) => {
     setActionLoading(true);
@@ -127,10 +160,10 @@ export default function AdminUsers() {
 
   const counts = useMemo(() => ({
     total: users.length,
-    admin: users.filter((u) => u.role === "admin").length,
-    company: users.filter((u) => u.role === "company").length,
-    individual: users.filter((u) => u.role === "individual").length,
-    none: users.filter((u) => !u.role).length }), [users]);
+    admin: users.filter((u) => resolveUserAccountType(u) === "admin").length,
+    company: users.filter((u) => resolveUserAccountType(u) === "company").length,
+    freelancer: users.filter((u) => resolveUserAccountType(u) === "freelancer").length,
+    none: users.filter((u) => !resolveUserAccountType(u)).length }), [users]);
 
   return (
     <div className="space-y-6">
@@ -140,33 +173,33 @@ export default function AdminUsers() {
           <p className="text-muted-foreground text-sm">{counts.total} {t("admin.registeredUsers")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportCSVButton data={filtered.map(u => ({ email: u.email, full_name: u.full_name, role: u.role, account_status: u.account_status, created_at: u.created_at, last_sign_in_at: u.last_sign_in_at }))} filename="users" />
+          <ExportCSVButton data={filtered.map(u => ({ email: u.email, full_name: u.full_name, account_type: resolveUserAccountType(u), legacy_role: u.role, account_status: u.account_status, approval_status: u.approval_status, capabilities: u.capabilities?.join(", "), created_at: u.created_at, last_sign_in_at: u.last_sign_in_at }))} filename="users" />
           <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading}><RefreshCw className={`h-3.5 w-3.5 me-1.5 ${loading ? "animate-spin" : ""}`} /> {t("admin.refresh")}</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-3 rounded-xl border border-border bg-card"><div className="flex items-center gap-2 mb-1"><Users className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">{t("admin.total")}</span></div><span className="text-xl font-bold">{counts.total}</span></div>
-        {Object.entries(roleConfig).slice(0, 3).map(([key, cfg]) => (
+        {Object.entries(accountTypeConfig).slice(0, 3).map(([key, cfg]) => (
           <div key={key} className="p-3 rounded-xl border border-border bg-card"><div className="flex items-center gap-2 mb-1"><cfg.icon className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">{cfg.label}</span></div><span className="text-xl font-bold">{counts[key as keyof typeof counts]}</span></div>
         ))}
-        <div className="p-3 rounded-xl border border-border bg-card"><div className="flex items-center gap-2 mb-1"><UserCircle className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">{t("admin.noRole")}</span></div><span className="text-xl font-bold">{counts.none}</span></div>
+        <div className="p-3 rounded-xl border border-border bg-card"><div className="flex items-center gap-2 mb-1"><UserCircle className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground">{lang === "ar" ? "غير محسوم" : "Unresolved"}</span></div><span className="text-xl font-bold">{counts.none}</span></div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1"><Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder={t("admin.searchUsers")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="ps-9 h-9" /></div>
         <Select value={filterRole} onValueChange={setFilterRole}>
-          <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder={t("admin.filterByRole")} /></SelectTrigger>
+          <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder={lang === "ar" ? "التصفية حسب نوع الحساب" : "Filter by account type"} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("admin.allRoles")}</SelectItem>
+            <SelectItem value="all">{lang === "ar" ? "كل أنواع الحساب" : "All account types"}</SelectItem>
             <SelectItem value="admin">{t("admin.administrator")}</SelectItem>
             <SelectItem value="company">Company</SelectItem>
-            <SelectItem value="individual">Individual</SelectItem>
+            <SelectItem value="freelancer">Freelancer</SelectItem>
             <SelectItem value="expert">Expert</SelectItem>
             <SelectItem value="instructor">Instructor</SelectItem>
             <SelectItem value="student">Student</SelectItem>
-            <SelectItem value="none">{t("admin.noRole")}</SelectItem>
+            <SelectItem value="none">{lang === "ar" ? "غير محسوم" : "Unresolved"}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -197,10 +230,10 @@ export default function AdminUsers() {
         <table className="w-full">
           <thead><tr className="border-b border-border bg-muted/50">
             <th className="text-start p-3 text-xs font-medium text-muted-foreground">{t("admin.user")}</th>
-            <th className="text-start p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">{t("admin.role")}</th>
+            <th className="text-start p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">{lang === "ar" ? "نوع الحساب" : "Account type"}</th>
             <th className="text-start p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">{lang === "ar" ? "الحالة" : "Status"}</th>
             <th className="text-start p-3 text-xs font-medium text-muted-foreground hidden lg:table-cell">{t("admin.lastSignIn")}</th>
-            <th className="text-end p-3 text-xs font-medium text-muted-foreground">{t("admin.assignRole")}</th>
+            <th className="text-end p-3 text-xs font-medium text-muted-foreground">{lang === "ar" ? "تحديث نوع الحساب" : "Update account type"}</th>
           </tr></thead>
           <tbody>
             {loading ? (
@@ -209,7 +242,8 @@ export default function AdminUsers() {
               <tr><td colSpan={5}><EmptyState icon={Users} title={lang === "ar" ? "لا يوجد مستخدمون" : "No users registered yet"} description={lang === "ar" ? "سيظهر المستخدمون هنا عند التسجيل" : "Users will appear here when they sign up"} /></td></tr>
             ) : (
               paginated.map((user) => {
-                const cfg = user.role ? roleConfig[user.role] : null;
+                const resolvedAccountType = resolveUserAccountType(user);
+                const cfg = resolvedAccountType ? accountTypeConfig[resolvedAccountType] : null;
                 return (
                   <tr key={user.id} className="border-b border-border hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setSelected(user)}>
                     <td className="p-3"><div className="flex items-center gap-3"><Avatar className="h-8 w-8"><AvatarImage src={user.avatar_url || undefined} /><AvatarFallback className="text-xs bg-primary/10 text-primary">{getInitials(user)}</AvatarFallback></Avatar><div className="min-w-0"><div className="text-sm font-medium truncate">{user.full_name || "—"}</div><div className="text-xs text-muted-foreground truncate">{user.email}</div></div></div></td>
@@ -217,13 +251,13 @@ export default function AdminUsers() {
                     <td className="p-3 hidden md:table-cell">{getStatusBadge(user.account_status)}</td>
                     <td className="p-3 text-xs text-muted-foreground hidden lg:table-cell">{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : t("admin.never")}</td>
                     <td className="p-3 text-end" onClick={(e) => e.stopPropagation()}>
-                      <Select value={user.role || "none"} onValueChange={(val) => assignRole(user.id, val)} disabled={updatingRole}>
+                      <Select value={resolveUserAccountType(user) || "unresolved"} onValueChange={(val) => assignAccountType(user.id, val)} disabled={updatingRole}>
                         <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">{t("admin.noRole")}</SelectItem>
+                          <SelectItem value="unresolved" disabled>{lang === "ar" ? "غير محسوم" : "Unresolved"}</SelectItem>
                           <SelectItem value="admin">{t("admin.administrator")}</SelectItem>
                           <SelectItem value="company">Company</SelectItem>
-                          <SelectItem value="individual">Individual</SelectItem>
+                          <SelectItem value="freelancer">Freelancer</SelectItem>
                           <SelectItem value="expert">Expert</SelectItem>
                           <SelectItem value="instructor">Instructor</SelectItem>
                           <SelectItem value="student">Student</SelectItem>
@@ -252,23 +286,28 @@ export default function AdminUsers() {
             <div className="space-y-4">
               <div className="flex items-center gap-4"><Avatar className="h-14 w-14"><AvatarImage src={selected.avatar_url || undefined} /><AvatarFallback className="bg-primary/10 text-primary text-lg">{getInitials(selected)}</AvatarFallback></Avatar><div><h3 className="font-semibold">{selected.full_name || t("admin.unnamedUser")}</h3><p className="text-sm text-muted-foreground">{selected.email}</p><div className="mt-1">{getStatusBadge(selected.account_status)}</div></div></div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground text-xs">{t("admin.role")}</span><div className="mt-1">
-                  <Select value={selected.role || "none"} onValueChange={(val) => assignRole(selected.id, val)} disabled={updatingRole}>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "نوع الحساب" : "Account type"}</span><div className="mt-1">
+                  <Select value={resolveUserAccountType(selected) || "unresolved"} onValueChange={(val) => assignAccountType(selected.id, val)} disabled={updatingRole}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">{t("admin.noRole")}</SelectItem>
+                      <SelectItem value="unresolved" disabled>{lang === "ar" ? "غير محسوم" : "Unresolved"}</SelectItem>
                       <SelectItem value="admin">{t("admin.administrator")}</SelectItem>
                       <SelectItem value="company">Company</SelectItem>
-                      <SelectItem value="individual">Individual</SelectItem>
+                      <SelectItem value="freelancer">Freelancer</SelectItem>
                       <SelectItem value="expert">Expert</SelectItem>
                       <SelectItem value="instructor">Instructor</SelectItem>
                       <SelectItem value="student">Student</SelectItem>
                     </SelectContent>
                   </Select>
                 </div></div>
-                <div><span className="text-muted-foreground text-xs">{t("admin.emailStatus")}</span><p className="font-medium mt-1">{selected.email_confirmed_at ? `✓ ${t("admin.verified")}` : `⏳ ${t("admin.pending")}`}</p></div>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "الدور القديم" : "Legacy role"}</span><p className="font-medium mt-1">{selected.role ? (selected.role === "individual" ? (lang === "ar" ? "مستقل (قديم)" : "Freelancer (legacy)") : selected.role) : "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "حالة الموافقة" : "Approval status"}</span><p className="font-medium mt-1">{selected.approval_status || "—"}</p></div>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "حالة البريد" : "Email status"}</span><p className="font-medium mt-1">{selected.email_confirmed_at ? `✓ ${t("admin.verified")}` : `⏳ ${t("admin.pending")}`}</p></div>
                 <div><span className="text-muted-foreground text-xs">{t("admin.joined")}</span><p className="font-medium">{new Date(selected.created_at).toLocaleDateString()}</p></div>
                 <div><span className="text-muted-foreground text-xs">{t("admin.lastSignIn")}</span><p className="font-medium">{selected.last_sign_in_at ? new Date(selected.last_sign_in_at).toLocaleDateString() : t("admin.never")}</p></div>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "القدرات" : "Capabilities"}</span><p className="font-medium">{selected.capabilities?.length || 0}</p></div>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "الشارات" : "Badges"}</span><p className="font-medium">{countValue(selected.badges)}</p></div>
+                <div><span className="text-muted-foreground text-xs">{lang === "ar" ? "الاستحقاقات" : "Entitlements"}</span><p className="font-medium">{countValue(selected.entitlements)}</p></div>
               </div>
 
               {/* Activity log */}
@@ -383,7 +422,8 @@ function HiringActivitySection({ user, lang }: { user: UserRecord; lang: string 
     const load = async () => {
       setLoading(true);
       try {
-        if (user.role === "individual") {
+        const resolvedAccountType = resolveUserAccountType(user);
+        if (resolvedAccountType === "freelancer") {
           const profileRes = await supabase.from("profiles").select("id").eq("user_id", user.id).maybeSingle();
           if (!profileRes.data) { setStats(null); setLoading(false); return; }
           const [received, accepted, completed, reviews] = await Promise.all([
@@ -395,7 +435,7 @@ function HiringActivitySection({ user, lang }: { user: UserRecord; lang: string 
           const ratings = reviews.data || [];
           const avg = ratings.length ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length) : 0;
           if (!cancelled) setStats({ received: received.count || 0, accepted: accepted.count || 0, completed: completed.count || 0, avgRating: parseFloat(avg.toFixed(1)) });
-        } else if (user.role === "company") {
+        } else if (resolvedAccountType === "company") {
           const [sent, jobs, applicants, reviews] = await Promise.all([
             supabase.from("hire_requests").select("id", { count: "exact", head: true }).eq("company_id", user.id),
             supabase.from("job_postings").select("id", { count: "exact", head: true }).eq("company_user_id", user.id),
@@ -413,7 +453,7 @@ function HiringActivitySection({ user, lang }: { user: UserRecord; lang: string 
     };
     load();
     return () => { cancelled = true; };
-  }, [user.id, user.role]);
+  }, [user.id, user.account_type, user.role]);
 
   if (loading) return <div className="h-16 bg-muted rounded-lg animate-pulse" />;
   if (!stats) return null;

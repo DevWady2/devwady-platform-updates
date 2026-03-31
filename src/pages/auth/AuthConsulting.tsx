@@ -4,15 +4,16 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import ModuleAuthEntry from "./ModuleAuthEntry";
 import ExpertSignupForm from "@/components/auth/ExpertSignupForm";
 import { MessageSquareMore, Calendar, Shield } from "lucide-react";
+import { normalizeAccountType } from "@/lib/accountType";
 
 export default function AuthConsulting() {
   const { lang } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const role = searchParams.get("role");
+  const requestedAccountType = normalizeAccountType(searchParams.get("accountType") || searchParams.get("role"));
   const redirect = searchParams.get("redirect") || "";
 
-  if (role === "expert") {
+  if (requestedAccountType === "expert") {
     return (
       <>
         <SEO title={lang === "ar" ? "طلب الانضمام كخبير" : "Expert Application"} />
@@ -23,7 +24,7 @@ export default function AuthConsulting() {
     );
   }
 
-  if (role) {
+  if (searchParams.get("accountType") || searchParams.get("role")) {
     return <Navigate to="/auth/consulting" replace />;
   }
 
@@ -60,7 +61,7 @@ export default function AuthConsulting() {
           title_ar: "دخول الخبراء",
           desc_en: "Apply as a consulting expert or sign in to your expert dashboard.",
           desc_ar: "قدّم طلب الانضمام كخبير أو سجل دخول للوحة الخبراء.",
-          path: "/auth/consulting?role=expert",
+          path: "/auth/consulting?accountType=expert",
           badge_en: "Experts",
           badge_ar: "خبراء",
         },

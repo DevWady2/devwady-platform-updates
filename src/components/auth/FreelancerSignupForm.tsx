@@ -113,7 +113,7 @@ export default function FreelancerSignupForm({ onBack }: Props) {
 
     const { error: signUpError } = await signUp(email, password, {
       full_name: fullName.trim(),
-      account_type: "individual",
+      account_type: "freelancer",
     });
 
     if (signUpError) {
@@ -123,7 +123,7 @@ export default function FreelancerSignupForm({ onBack }: Props) {
       return;
     }
 
-    // insert role
+    // Transitional legacy-role bridge — keep syncing user_roles until destructive cleanup
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase.from("user_roles").insert({ user_id: user.id, role: "individual" as any });
@@ -209,7 +209,7 @@ export default function FreelancerSignupForm({ onBack }: Props) {
       {/* back link */}
       <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
         <ArrowLeft className="icon-flip-rtl h-4 w-4" />
-        {isAr ? "العودة لاختيار نوع الحساب" : "Back to role selection"}
+        {isAr ? "العودة لاختيار نوع الحساب" : "Back to account type selection"}
       </button>
 
       {/* step indicator */}

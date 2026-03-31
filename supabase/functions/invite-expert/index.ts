@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildAccountTypeConflictPayload, ensureCanonicalProfile, isAdminUser, syncLegacyRoleBridge } from "../_shared/account-identity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,9 +35,8 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roleData } = await adminClient
-      .from("user_roles").select("role").eq("user_id", caller.id).eq("role", "admin").maybeSingle();
-    if (!roleData) {
+    const isAdmin = await isAdminUser(adminClient, caller.id);
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -67,20 +67,22 @@ Deno.serve(async (req) => {
     }
 
     let userId: string;
+    let resolvedAccountType: string | null = "expert";
 
     if (existing_user_id) {
       // Link to existing user account
       userId = existing_user_id;
 
-      // Update or insert expert role
-      const { data: existingRole } = await adminClient
-        .from("user_roles").select("id, role").eq("user_id", userId).maybeSingle();
-
-      if (existingRole) {
-        await adminClient.from("user_roles").update({ role: "expert" as any }).eq("id", existingRole.id);
-      } else {
-        await adminClient.from("user_roles").insert({ user_id: userId, role: "expert" as any });
+      const canonicalProfile = await ensureCanonicalProfile(adminClient, userId, "expert");
+      resolvedAccountType = canonicalProfile.resolvedAccountType || resolvedAccountType;
+      if (canonicalProfile.conflict) {
+        return new Response(JSON.stringify(buildAccountTypeConflictPayload(canonicalProfile)), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
+
+      await syncLegacyRoleBridge(adminClient, userId, "expert");
 
       // Send notification
       await adminClient.rpc("create_notification", {
@@ -115,8 +117,16 @@ Deno.serve(async (req) => {
 
       userId = newUser.user.id;
 
-      // Insert expert role
-      await adminClient.from("user_roles").insert({ user_id: userId, role: "expert" as any });
+      const canonicalProfile = await ensureCanonicalProfile(adminClient, userId, "expert");
+      resolvedAccountType = canonicalProfile.resolvedAccountType || resolvedAccountType;
+      if (canonicalProfile.conflict) {
+        return new Response(JSON.stringify(buildAccountTypeConflictPayload(canonicalProfile)), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await syncLegacyRoleBridge(adminClient, userId, "expert");
 
       // Generate magic link for invitation
       const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
@@ -160,7 +170,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, user_id: userId }), {
+    return new Response(JSON.stringify({
+      success: true,
+      user_id: userId,
+      account_type: resolvedAccountType,
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

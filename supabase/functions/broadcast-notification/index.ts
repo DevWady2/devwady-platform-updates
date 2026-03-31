@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAudienceUserIds, isAdminUser, normalizeBroadcastTarget } from "../_shared/account-identity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,14 +38,9 @@ Deno.serve(async (req) => {
 
     // Check admin role
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roleData } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
-      .eq("role", "admin")
-      .maybeSingle();
+    const isAdmin = await isAdminUser(adminClient, caller.id);
 
-    if (!roleData) {
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -60,19 +56,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get target user IDs based on audience
-    let userIds: string[] = [];
-    if (target === "all") {
-      const { data: roles } = await adminClient.from("user_roles").select("user_id");
-      userIds = [...new Set((roles || []).map((r: any) => r.user_id))];
-    } else if (target === "individuals" || target === "companies" || target === "admins") {
-      const roleValue = target === "individuals" ? "individual" : target === "companies" ? "company" : "admin";
-      const { data: roles } = await adminClient.from("user_roles").select("user_id").eq("role", roleValue);
-      userIds = (roles || []).map((r: any) => r.user_id);
-    }
+    const normalizedTarget = normalizeBroadcastTarget(target);
+    const userIds = await getAudienceUserIds(adminClient, normalizedTarget);
 
     if (userIds.length === 0) {
-      return new Response(JSON.stringify({ count: 0 }), {
+      return new Response(JSON.stringify({ count: 0, target: normalizedTarget }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -88,12 +76,16 @@ Deno.serve(async (req) => {
         _body_en: body_en || null,
         _body_ar: body_ar || null,
         _link: link || null,
-        _metadata: JSON.stringify({ broadcast: true, sent_by: caller.id }),
+        _metadata: JSON.stringify({
+          broadcast: true,
+          target: normalizedTarget,
+          sent_by: caller.id,
+        }),
       });
       if (!error) count++;
     }
 
-    return new Response(JSON.stringify({ count }), {
+    return new Response(JSON.stringify({ count, target: normalizedTarget }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

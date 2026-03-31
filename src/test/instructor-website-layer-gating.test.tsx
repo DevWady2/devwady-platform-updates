@@ -18,7 +18,7 @@ describe('Instructor website-layer route gating', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('redirects a student away from /instructor/questions', async () => {
-    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, role: 'student' });
+    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, accountType: 'student', capabilities: [], role: 'student', roles: ['student'] });
 
     render(
       <MemoryRouter initialEntries={['/instructor/questions']}>
@@ -27,7 +27,7 @@ describe('Instructor website-layer route gating', () => {
             path="/instructor/questions"
             element={
               <AuthGuard>
-                <RoleGuard allowedRoles={['instructor', 'admin']}>
+                <RoleGuard allowedAccountTypes={['instructor', 'admin']}>
                   <div>Questions Page</div>
                 </RoleGuard>
               </AuthGuard>
@@ -42,7 +42,7 @@ describe('Instructor website-layer route gating', () => {
   });
 
   it('allows an instructor to access /instructor/questions', () => {
-    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, role: 'instructor' });
+    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, accountType: 'instructor', capabilities: ['create_courses'], role: 'instructor', roles: ['instructor'] });
 
     render(
       <MemoryRouter initialEntries={['/instructor/questions']}>
@@ -51,7 +51,7 @@ describe('Instructor website-layer route gating', () => {
             path="/instructor/questions"
             element={
               <AuthGuard>
-                <RoleGuard allowedRoles={['instructor', 'admin']}>
+                <RoleGuard allowedAccountTypes={['instructor', 'admin']}>
                   <div>Questions Page</div>
                 </RoleGuard>
               </AuthGuard>
@@ -66,7 +66,7 @@ describe('Instructor website-layer route gating', () => {
   });
 
   it('allows an admin to access /instructor/questions', () => {
-    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, role: 'admin' });
+    mockUseAuth.mockReturnValue({ user: { id: 'u1' }, loading: false, accountType: 'admin', capabilities: ['admin_backoffice'], role: 'admin', roles: ['admin'] });
 
     render(
       <MemoryRouter initialEntries={['/instructor/questions']}>
@@ -75,7 +75,7 @@ describe('Instructor website-layer route gating', () => {
             path="/instructor/questions"
             element={
               <AuthGuard>
-                <RoleGuard allowedRoles={['instructor', 'admin']}>
+                <RoleGuard allowedAccountTypes={['instructor', 'admin']}>
                   <div>Questions Page</div>
                 </RoleGuard>
               </AuthGuard>

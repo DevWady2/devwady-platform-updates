@@ -82,26 +82,44 @@ export const mockUseQueryClient = vi.mocked(useQueryClient);
 
 export const invalidateQueriesMock = vi.fn();
 
+function legacyRoleFromAccountType(accountType: string | null) {
+  if (accountType === "freelancer") return "individual";
+  return accountType;
+}
+
 export function resetTalentTestMocks() {
   vi.clearAllMocks();
   navigateMock.mockReset();
   invalidateQueriesMock.mockReset();
 
+  const accountType = "company";
+  const role = legacyRoleFromAccountType(accountType);
+
   mockUseAuth.mockReturnValue({
     user: { id: "user-1", email: "user@example.com" },
     session: null,
     loading: false,
-    role: "company",
-    roles: ["company"],
+    accountType,
+    role,
+    roles: role ? [role] : [],
+    capabilities: ["post_jobs", "request_services", "manage_team"],
     accountStatus: "active",
+    approvalStatus: "approved",
+    badges: [],
+    entitlements: [],
     isEmailVerified: true,
+    hasCapability: vi.fn((cap: string) => ["post_jobs", "request_services", "manage_team"].includes(cap)),
     signUp: vi.fn(),
     signIn: vi.fn(),
     signOut: vi.fn(),
     resetPassword: vi.fn(),
     updatePassword: vi.fn(),
-    switchRole: vi.fn(),
-    addRole: vi.fn(),
+    switchRole: vi.fn(async () => {
+      throw new Error("Role switching is disabled. The platform now uses a single canonical account model.");
+    }),
+    addRole: vi.fn(async () => ({
+      error: new Error("Adding roles is disabled. The platform now uses a single canonical account model."),
+    })),
   } as any);
 
   mockUseLanguage.mockReturnValue({

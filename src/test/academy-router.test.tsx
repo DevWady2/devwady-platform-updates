@@ -22,13 +22,13 @@ vi.mock("@/portals/academy/pages/AcademyInstructorDashboard", () => ({
   default: () => <div>instructor-dashboard-view</div>,
 }));
 
-/** Render AcademyDashboard inside a router with a sentinel route for redirect verification */
 function renderWithSentinel() {
   return render(
     <MemoryRouter initialEntries={["/academy/portal"]}>
       <Routes>
         <Route path="/academy/portal" element={<AcademyDashboard />} />
         <Route path="/instructor/workspace" element={<div>instructor-workspace-sentinel</div>} />
+        <Route path="/" element={<div>home-sentinel</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -39,30 +39,21 @@ describe("AcademyDashboard router", () => {
     resetAcademyTestMocks();
   });
 
-  it("renders student dashboard for student role", () => {
-    mockUseAuth.mockReturnValue({ roles: ["student"] } as any);
+  it("renders student dashboard for student account types", () => {
+    mockUseAuth.mockReturnValue({ accountType: "student", role: "student", roles: ["student"] } as any);
     renderWithSentinel();
     expect(screen.getByText("student-dashboard-view")).toBeInTheDocument();
   });
 
-  it("redirects instructor-only user to /instructor/workspace", () => {
-    mockUseAuth.mockReturnValue({ roles: ["instructor"] } as any);
+  it("redirects instructor-only users to /instructor/workspace", () => {
+    mockUseAuth.mockReturnValue({ accountType: "instructor", role: "instructor", roles: ["instructor"] } as any);
     renderWithSentinel();
-    // Positive proof: landed on canonical instructor workspace
     expect(screen.getByText("instructor-workspace-sentinel")).toBeInTheDocument();
-    // Negative proof: student dashboard not rendered
     expect(screen.queryByText("student-dashboard-view")).not.toBeInTheDocument();
   });
 
-  it("multi-role student+instructor still sees student dashboard", () => {
-    mockUseAuth.mockReturnValue({ roles: ["student", "instructor"] } as any);
-    renderWithSentinel();
-    expect(screen.getByText("student-dashboard-view")).toBeInTheDocument();
-    expect(screen.queryByText("instructor-workspace-sentinel")).not.toBeInTheDocument();
-  });
-
-  it("renders student dashboard for admin role (admin has student access)", () => {
-    mockUseAuth.mockReturnValue({ roles: ["admin"] } as any);
+  it("preserves admin access to the student dashboard", () => {
+    mockUseAuth.mockReturnValue({ accountType: "admin", role: "admin", roles: ["admin"] } as any);
     renderWithSentinel();
     expect(screen.getByText("student-dashboard-view")).toBeInTheDocument();
   });

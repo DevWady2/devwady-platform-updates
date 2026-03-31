@@ -7,7 +7,14 @@ import { createTestQueryClient } from '@/test/test-utils';
 const mockState = {
   session: null as any,
   roles: [] as Array<{ role: 'individual' | 'company' | 'admin' | 'expert' | 'student' | 'instructor'; is_primary: boolean }>,
-  accountStatus: 'active',
+  profile: {
+    account_status: 'active' as 'pending_verification' | 'pending_approval' | 'active' | 'suspended' | 'banned' | 'deactivated',
+    account_type: null as null | 'freelancer' | 'company' | 'admin' | 'expert' | 'student' | 'instructor' | 'individual',
+    capabilities: [] as string[],
+    approval_status: null as null | 'auto_approved' | 'pending_review' | 'approved' | 'rejected',
+    badges: [] as string[],
+    entitlements: [] as string[],
+  },
   signUpError: null as any,
   signInError: null as any,
   resetPasswordError: null as any,
@@ -23,9 +30,6 @@ const resetPasswordForEmail = vi.fn();
 const updateUser = vi.fn();
 const channelUnsubscribe = vi.fn();
 
-const userRolesUpdateCalls: any[] = [];
-const userRolesInsertCalls: any[] = [];
-
 function createAwaitableChain(getResult: () => any, methods: string[] = ['eq', 'order', 'maybeSingle']) {
   const chain: any = {};
   methods.forEach((method) => {
@@ -39,30 +43,12 @@ const from = vi.fn((table: string) => {
   if (table === 'user_roles') {
     return {
       select: vi.fn(() => createAwaitableChain(() => ({ data: mockState.roles, error: null }), ['eq', 'order'])),
-      update: vi.fn((payload: any) => {
-        userRolesUpdateCalls.push(payload);
-        if (payload.is_primary === false) {
-          mockState.roles = mockState.roles.map((r) => ({ ...r, is_primary: false }));
-        }
-        if (payload.is_primary === true) {
-          mockState.roles = mockState.roles.map((r) => ({ ...r, is_primary: r.role === 'individual' }));
-        }
-        return createAwaitableChain(() => ({ data: null, error: null }), ['eq']);
-      }),
-      insert: vi.fn((payload: any) => {
-        userRolesInsertCalls.push(payload);
-        mockState.roles = [
-          ...mockState.roles,
-          { role: payload.role, is_primary: Boolean(payload.is_primary) },
-        ];
-        return Promise.resolve({ error: null });
-      }),
     };
   }
 
   if (table === 'profiles') {
     return {
-      select: vi.fn(() => createAwaitableChain(() => ({ data: { account_status: mockState.accountStatus }, error: null }), ['eq', 'maybeSingle'])),
+      select: vi.fn(() => createAwaitableChain(() => ({ data: mockState.profile, error: null }), ['eq', 'maybeSingle'])),
     };
   }
 
@@ -86,19 +72,44 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 function Consumer() {
   const auth = useAuth();
+
   return (
     <div>
       <div data-testid="loading">{String(auth.loading)}</div>
+      <div data-testid="account-type">{auth.accountType ?? 'none'}</div>
       <div data-testid="role">{auth.role ?? 'none'}</div>
       <div data-testid="roles">{auth.roles.join(',')}</div>
+      <div data-testid="capabilities">{auth.capabilities.join(',')}</div>
       <div data-testid="status">{auth.accountStatus ?? 'none'}</div>
+      <div data-testid="approval">{auth.approvalStatus ?? 'none'}</div>
+      <div data-testid="badges">{auth.badges.join(',') || 'none'}</div>
+      <div data-testid="entitlements">{auth.entitlements.join(',') || 'none'}</div>
       <div data-testid="verified">{String(auth.isEmailVerified)}</div>
+      <div data-testid="has-capability">{String(auth.hasCapability('post_jobs'))}</div>
       <button onClick={() => auth.signIn('test@devwady.com', 'secret')}>sign-in</button>
-      <button onClick={() => auth.signUp('new@devwady.com', 'secret', { role: 'company' })}>sign-up</button>
+      <button onClick={() => auth.signUp('new@devwady.com', 'secret', { accountType: 'company' })}>sign-up</button>
       <button onClick={() => auth.resetPassword('reset@devwady.com')}>reset</button>
       <button onClick={() => auth.updatePassword('new-secret')}>update-password</button>
-      <button onClick={() => auth.switchRole('individual')}>switch-role</button>
-      <button onClick={() => auth.addRole('student')}>add-role</button>
+      <button
+        onClick={async () => {
+          try {
+            await auth.switchRole('individual');
+            (window as any).__switchRoleResult = 'resolved';
+          } catch (error: any) {
+            (window as any).__switchRoleResult = error.message;
+          }
+        }}
+      >
+        switch-role
+      </button>
+      <button
+        onClick={async () => {
+          const result = await auth.addRole('student');
+          (window as any).__addRoleResult = result.error?.message ?? 'none';
+        }}
+      >
+        add-role
+      </button>
       <button onClick={() => auth.signOut()}>sign-out</button>
     </div>
   );
@@ -107,6 +118,8 @@ function Consumer() {
 describe('AuthProvider / useAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (window as any).__switchRoleResult = null;
+    (window as any).__addRoleResult = null;
     mockState.session = {
       user: {
         id: 'user-1',
@@ -114,11 +127,15 @@ describe('AuthProvider / useAuth', () => {
         email_confirmed_at: '2026-01-01T00:00:00Z',
       },
     };
-    mockState.roles = [
-      { role: 'company', is_primary: true },
-      { role: 'individual', is_primary: false },
-    ];
-    mockState.accountStatus = 'active';
+    mockState.roles = [{ role: 'individual', is_primary: true }];
+    mockState.profile = {
+      account_status: 'pending_approval',
+      account_type: 'freelancer',
+      capabilities: [],
+      approval_status: null,
+      badges: [],
+      entitlements: [],
+    };
 
     onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: channelUnsubscribe } } });
     getSession.mockResolvedValue({ data: { session: mockState.session } });
@@ -127,11 +144,9 @@ describe('AuthProvider / useAuth', () => {
     signOut.mockResolvedValue({ error: null });
     resetPasswordForEmail.mockResolvedValue({ error: mockState.resetPasswordError });
     updateUser.mockResolvedValue({ error: mockState.updatePasswordError });
-    userRolesUpdateCalls.length = 0;
-    userRolesInsertCalls.length = 0;
   });
 
-  it('hydrates session, primary role, roles, and account status from Supabase', async () => {
+  it('hydrates canonical account state from profiles first and keeps role/roles as a single-role compatibility shim', async () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -143,12 +158,44 @@ describe('AuthProvider / useAuth', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
-    expect(screen.getByTestId('role')).toHaveTextContent('company');
-    expect(screen.getByTestId('roles')).toHaveTextContent('company,individual');
-    expect(screen.getByTestId('status')).toHaveTextContent('active');
+    expect(screen.getByTestId('account-type')).toHaveTextContent('freelancer');
+    expect(screen.getByTestId('role')).toHaveTextContent('individual');
+    expect(screen.getByTestId('roles')).toHaveTextContent('individual');
+    expect(screen.getByTestId('capabilities')).toHaveTextContent('apply_jobs');
+    expect(screen.getByTestId('status')).toHaveTextContent('pending_approval');
+    expect(screen.getByTestId('approval')).toHaveTextContent('pending_review');
+    expect(screen.getByTestId('badges')).toHaveTextContent('none');
+    expect(screen.getByTestId('entitlements')).toHaveTextContent('none');
     expect(screen.getByTestId('verified')).toHaveTextContent('true');
+    expect(screen.getByTestId('has-capability')).toHaveTextContent('false');
     expect(onAuthStateChange).toHaveBeenCalledTimes(1);
     expect(getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks approved status only for active accounts with a canonical account type', async () => {
+    mockState.roles = [];
+    mockState.profile = {
+      account_status: 'active',
+      account_type: 'company',
+      capabilities: [],
+      approval_status: null,
+      badges: [],
+      entitlements: [],
+    };
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Consumer />
+        </AuthProvider>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('account-type')).toHaveTextContent('company');
+    expect(screen.getByTestId('approval')).toHaveTextContent('approved');
+    expect(screen.getByTestId('has-capability')).toHaveTextContent('true');
   });
 
   it('delegates sign-in, sign-up, reset, and password update to Supabase auth', async () => {
@@ -174,7 +221,7 @@ describe('AuthProvider / useAuth', () => {
       expect(signUp).toHaveBeenCalledWith({
         email: 'new@devwady.com',
         password: 'secret',
-        options: { data: { role: 'company' }, emailRedirectTo: window.location.origin },
+        options: { data: { accountType: 'company' }, emailRedirectTo: window.location.origin },
       });
       expect(resetPasswordForEmail).toHaveBeenCalledWith('reset@devwady.com', {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -183,9 +230,8 @@ describe('AuthProvider / useAuth', () => {
     });
   });
 
-  it('switches the active role and clears the query cache', async () => {
+  it('keeps canonical identity stable when deprecated switchRole and addRole are called', async () => {
     const queryClient = createTestQueryClient();
-    const clearSpy = vi.spyOn(queryClient, 'clear');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -195,16 +241,22 @@ describe('AuthProvider / useAuth', () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('role')).toHaveTextContent('company'));
+    await waitFor(() => expect(screen.getByTestId('account-type')).toHaveTextContent('freelancer'));
 
     fireEvent.click(screen.getByText('switch-role'));
+    fireEvent.click(screen.getByText('add-role'));
 
-    await waitFor(() => expect(screen.getByTestId('role')).toHaveTextContent('individual'));
-    expect(clearSpy).toHaveBeenCalled();
-    expect(userRolesUpdateCalls).toEqual([{ is_primary: false }, { is_primary: true }]);
+    await waitFor(() => {
+      expect((window as any).__switchRoleResult).toContain('disabled');
+      expect((window as any).__addRoleResult).toContain('disabled');
+    });
+
+    expect(screen.getByTestId('account-type')).toHaveTextContent('freelancer');
+    expect(screen.getByTestId('role')).toHaveTextContent('individual');
+    expect(screen.getByTestId('roles')).toHaveTextContent('individual');
   });
 
-  it('adds a new role, refetches roles, and signs out cleanly', async () => {
+  it('signs out cleanly and clears auth state', async () => {
     const queryClient = createTestQueryClient();
     const clearSpy = vi.spyOn(queryClient, 'clear');
 
@@ -216,14 +268,15 @@ describe('AuthProvider / useAuth', () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('roles')).toHaveTextContent('company,individual'));
-
-    fireEvent.click(screen.getByText('add-role'));
-    await waitFor(() => expect(screen.getByTestId('roles')).toHaveTextContent('student'));
-    expect(userRolesInsertCalls[0]).toEqual({ user_id: 'user-1', role: 'student', is_primary: false });
+    await waitFor(() => expect(screen.getByTestId('account-type')).toHaveTextContent('freelancer'));
 
     fireEvent.click(screen.getByText('sign-out'));
-    await waitFor(() => expect(screen.getByTestId('role')).toHaveTextContent('none'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('account-type')).toHaveTextContent('none');
+      expect(screen.getByTestId('role')).toHaveTextContent('none');
+      expect(screen.getByTestId('roles')).toHaveTextContent('');
+    });
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(clearSpy).toHaveBeenCalled();
   });

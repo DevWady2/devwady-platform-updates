@@ -11,6 +11,8 @@ import BackofficeLayout from '@/portals/backoffice/BackofficeLayout';
 const authState = {
   user: { email: 'tester@devwady.com' },
   loading: false,
+  accountType: 'company' as string,
+  role: 'company' as string,
   roles: ['company'] as string[],
   signOut: vi.fn(async () => {}),
 };
@@ -58,6 +60,12 @@ vi.mock('framer-motion', () => ({
   },
 }));
 
+function setAuthAccountType(accountType: string) {
+  authState.accountType = accountType;
+  authState.role = accountType === 'freelancer' ? 'individual' : accountType;
+  authState.roles = authState.role ? [authState.role] : [];
+}
+
 function renderAt(path: string, element: React.ReactElement) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -72,7 +80,7 @@ describe('shared portal shell integration', () => {
   beforeEach(() => {
     authState.loading = false;
     authState.user = { email: 'tester@devwady.com' };
-    authState.roles = ['company'];
+    setAuthAccountType('company');
     authState.signOut.mockClear();
 
     languageState.lang = 'en';
@@ -99,7 +107,7 @@ describe('shared portal shell integration', () => {
   });
 
   it('renders talent company navigation for company users', () => {
-    authState.roles = ['company'];
+    setAuthAccountType('company');
 
     renderAt(
       '/talent/portal/company/jobs',
@@ -115,8 +123,8 @@ describe('shared portal shell integration', () => {
     expect(screen.getByText('Jobs')).toBeInTheDocument();
   });
 
-  it('renders talent freelancer navigation for individual users', () => {
-    authState.roles = ['individual'];
+  it('renders talent freelancer navigation for freelancer accounts via the legacy role shim', () => {
+    setAuthAccountType('freelancer');
 
     renderAt(
       '/talent/portal/freelancer/profile',
@@ -132,7 +140,7 @@ describe('shared portal shell integration', () => {
   });
 
   it('renders consulting expert navigation for expert users', () => {
-    authState.roles = ['expert'];
+    setAuthAccountType('expert');
 
     renderAt(
       '/consulting/portal/bookings',
@@ -146,8 +154,8 @@ describe('shared portal shell integration', () => {
     expect(screen.queryByText('Browse Experts')).not.toBeInTheDocument();
   });
 
-  it('renders consulting client navigation for non-expert users', () => {
-    authState.roles = ['individual'];
+  it('renders consulting client navigation for freelancer accounts through compatibility role data', () => {
+    setAuthAccountType('freelancer');
 
     renderAt(
       '/consulting/portal/sessions',
@@ -161,7 +169,7 @@ describe('shared portal shell integration', () => {
   });
 
   it('renders instructor workspace navigation for instructor users via InstructorWorkspaceLayout', () => {
-    authState.roles = ['instructor'];
+    setAuthAccountType('instructor');
 
     const InstructorWorkspaceLayout = require('@/portals/instructor/InstructorWorkspaceLayout').default;
 
@@ -177,7 +185,7 @@ describe('shared portal shell integration', () => {
   });
 
   it('renders academy student navigation for student users', () => {
-    authState.roles = ['student'];
+    setAuthAccountType('student');
 
     renderAt(
       '/academy/portal/courses',
@@ -192,7 +200,7 @@ describe('shared portal shell integration', () => {
   });
 
   it('renders backoffice shell with admin navigation and deep breadcrumb', () => {
-    authState.roles = ['admin'];
+    setAuthAccountType('admin');
 
     renderAt(
       '/admin/quotes/new',

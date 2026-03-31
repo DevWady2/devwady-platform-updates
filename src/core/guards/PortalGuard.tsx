@@ -4,8 +4,8 @@
  *
  * Logic:
  *  1. If requiresAuth and no user → redirect to login
- *  2. If allowedAccountTypes is non-empty and user is authenticated but lacks matching accountType → redirect home
- *     Falls back to legacy allowedRoles check for compatibility during migration
+ *  2. Access is evaluated canonically via accountType first, then optional capability hints.
+ *     Legacy role fallback is used only when canonical identity is unavailable.
  *  3. Authenticated users pass through AccountStatusGate
  *  4. Public access (no auth required) → pass through
  */
@@ -13,7 +13,7 @@ import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
-import type { PortalConfig } from "@/core/portals/registry";
+import { canAccessPortal, type PortalConfig } from "@/core/portals/registry";
 import AccountStatusGate from "@/components/auth/AccountStatusGate";
 
 interface PortalGuardProps {
@@ -22,7 +22,7 @@ interface PortalGuardProps {
 }
 
 export default function PortalGuard({ portal, children }: PortalGuardProps) {
-  const { user, loading, accountType, roles } = useAuth();
+  const { user, loading, accountType, capabilities, role } = useAuth();
 
   if (loading) {
     return (
@@ -37,13 +37,14 @@ export default function PortalGuard({ portal, children }: PortalGuardProps) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Access check — prefer canonical accountType, fall back to legacy roles
-  if (user && portal.allowedAccountTypes.length > 0) {
-    const hasCanonicalAccess = accountType && portal.allowedAccountTypes.includes(accountType);
-    const hasLegacyAccess = portal.allowedRoles.length > 0 && portal.allowedRoles.some((r) => roles.includes(r));
-    if (!hasCanonicalAccess && !hasLegacyAccess) {
-      return <Navigate to="/" replace />;
-    }
+  // 2. Canonical-first access check
+  const portalDefinesAccess =
+    portal.allowedAccountTypes.length > 0 ||
+    (portal.allowedCapabilities?.length ?? 0) > 0 ||
+    portal.allowedRoles.length > 0;
+
+  if (user && portalDefinesAccess && !canAccessPortal(portal, { accountType, capabilities, role })) {
+    return <Navigate to="/" replace />;
   }
 
   // 3. Authenticated users go through account status check

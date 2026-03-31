@@ -9,14 +9,14 @@ const mockUseMutation = vi.hoisted(() => vi.fn());
 const mockUseQueryClient = vi.hoisted(() => ({ invalidateQueries: vi.fn() }));
 const mockUseExpertRecord = vi.hoisted(() => vi.fn());
 const mutateSpy = vi.hoisted(() => vi.fn());
-const rolesState = vi.hoisted(() => ({ roles: ["expert"] as string[] }));
+const authState = vi.hoisted(() => ({ accountType: "expert", role: "expert", roles: ["expert"] as string[] }));
 
 vi.mock("@tanstack/react-query", () => ({
   useMutation: mockUseMutation,
   useQueryClient: () => mockUseQueryClient,
 }));
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: () => ({ lang: "en" }) }));
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ roles: rolesState.roles }) }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({ update: vi.fn(() => ({ eq: vi.fn() })) })),
@@ -34,6 +34,9 @@ describe("Consulting profile and settings", () => {
     mockUseMutation.mockReset();
     mutateSpy.mockReset();
     mockUseExpertRecord.mockReset();
+    authState.accountType = "expert";
+    authState.role = "expert";
+    authState.roles = ["expert"];
     mockUseExpertRecord.mockReturnValue({
       data: {
         id: "expert-1",
@@ -77,16 +80,20 @@ describe("Consulting profile and settings", () => {
     expect(mutateSpy).toHaveBeenCalled();
   });
 
-  it("shows expert-specific settings cards for experts", () => {
-    rolesState.roles = ["expert"];
+  it("shows expert-specific settings cards for expert accounts", () => {
+    authState.accountType = "expert";
+    authState.role = "expert";
+    authState.roles = ["expert"];
     renderInRouter(<ConsultingSettings />);
     expect(screen.getByText("Expert Profile")).toBeInTheDocument();
     expect(screen.getByText("Availability")).toBeInTheDocument();
     expect(screen.getByText("Notifications")).toBeInTheDocument();
   });
 
-  it("hides expert-only cards for client roles", () => {
-    rolesState.roles = ["individual"];
+  it("hides expert-only cards for freelancer accounts while preserving legacy role compatibility", () => {
+    authState.accountType = "freelancer";
+    authState.role = "individual";
+    authState.roles = ["individual"];
     renderInRouter(<ConsultingSettings />);
     expect(screen.queryByText("Expert Profile")).not.toBeInTheDocument();
     expect(screen.queryByText("Availability")).not.toBeInTheDocument();

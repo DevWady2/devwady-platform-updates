@@ -5,18 +5,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Info } from "lucide-react";
 
-type AddableRole = "individual" | "company" | "student";
-
 interface AddRoleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  targetRole: AddableRole;
-  onSuccess: () => void;
+  /** @deprecated Compatibility-only prop; the dialog is informational only. */
+  targetAccountType?: string;
+  /** @deprecated Compatibility-only callback; never invoked. */
+  onSuccess?: () => void;
 }
 
 /**
  * AddRoleDialog is disabled in the single-account model.
- * It shows an informational message instead of allowing role addition.
+ * It remains as a safe compatibility surface and only shows an informational message.
  */
 export default function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps) {
   const { lang } = useLanguage();
@@ -32,8 +32,8 @@ export default function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps
           </DialogTitle>
           <DialogDescription>
             {isAr
-              ? "إضافة أدوار جديدة غير متاحة حالياً. حسابك يعمل بنوع حساب واحد."
-              : "Adding new roles is not currently available. Your account operates with a single account type."}
+              ? "إضافة نوع حساب آخر غير متاحة حالياً. حسابك يعمل بنوع حساب واحد."
+              : "Adding another account type is not currently available. Your account operates with a single account type."}
           </DialogDescription>
         </DialogHeader>
         <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">

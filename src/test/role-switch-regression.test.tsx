@@ -1,29 +1,34 @@
 /**
- * Focused regression tests for multi-role switch safety.
- * Covers: Instructor+Freelancer, Instructor+Student, and action-safety (double-click).
+ * Regression coverage for the single-account compatibility boundary.
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-/* ── mock state ── */
-let mockRole: string = "instructor";
-let mockRoles: string[] = ["instructor", "individual"];
-let switchDelay = 0;
-const mockSwitchRole = vi.fn(async (r: string) => {
-  if (switchDelay > 0) await new Promise((res) => setTimeout(res, switchDelay));
-  mockRole = r;
+let mockAccountType: "freelancer" | "instructor" = "freelancer";
+let mockRole: "individual" | "instructor" = "individual";
+let mockRoles: string[] = ["individual"];
+const mockSwitchRole = vi.fn(async () => {
+  throw new Error("Role switching is disabled. The platform now uses a single canonical account model.");
 });
+const mockAddRole = vi.fn(async () => ({
+  error: new Error("Adding roles is disabled. The platform now uses a single canonical account model."),
+}));
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
     user: { id: "u1", email: "test@example.com" },
     session: {},
     loading: false,
+    accountType: mockAccountType,
     role: mockRole,
     roles: mockRoles,
+    capabilities: [],
     accountStatus: "active",
+    approvalStatus: "approved",
+    badges: [],
+    entitlements: [],
     isEmailVerified: true,
     signUp: vi.fn(),
     signIn: vi.fn(),
@@ -31,8 +36,10 @@ vi.mock("@/contexts/AuthContext", () => ({
     resetPassword: vi.fn(),
     updatePassword: vi.fn(),
     switchRole: mockSwitchRole,
-    addRole: vi.fn(),
+    addRole: mockAddRole,
+    hasCapability: vi.fn(() => false),
   }),
+  legacyRoleFrom: (accountType: string) => (accountType === "freelancer" ? "individual" : accountType),
 }));
 
 vi.mock("@/contexts/LanguageContext", () => ({
@@ -45,28 +52,34 @@ vi.mock("@/contexts/ThemeContext", () => ({
   ThemeProvider: ({ children }: any) => children,
 }));
 
+vi.mock("@/hooks/useProfileCompleteness", () => ({
+  useProfileCompleteness: () => ({ percentage: 80, score: 80, loading: false, nextStep: "Add your bio" }),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       select: () => ({
         eq: () => ({
           maybeSingle: () => Promise.resolve({ data: { full_name: "Test", avatar_url: null }, error: null }),
-          order: () => ({ then: (r: any) => Promise.resolve({ data: [], error: null }).then(r) }),
         }),
       }),
     }),
+    auth: {
+      updateUser: vi.fn(),
+      resend: vi.fn(),
+      getSession: vi.fn(() => Promise.resolve({ data: { session: null } })),
+      signOut: vi.fn(),
+    },
+    functions: { invoke: vi.fn() },
   },
 }));
 
-vi.mock("@/hooks/useProfileCompleteness", () => ({
-  useProfileCompleteness: () => ({ percentage: 80, score: 80, loading: false }),
-}));
-
 vi.mock("@/components/SEO", () => ({ default: () => null }));
-
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
-}));
 
 function wrap(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -78,109 +91,53 @@ function wrap(ui: React.ReactElement) {
 }
 
 beforeEach(() => {
-  mockRole = "instructor";
-  mockRoles = ["instructor", "individual"];
-  switchDelay = 0;
+  mockAccountType = "freelancer";
+  mockRole = "individual";
+  mockRoles = ["individual"];
   mockSwitchRole.mockClear();
+  mockAddRole.mockClear();
 });
 
-/* ═══════════════════════════════════════════════════════════════
- * 1. Instructor + Freelancer (individual) — no stale instructor state
- * ═══════════════════════════════════════════════════════════════ */
-describe("Instructor + Freelancer switch regression", () => {
-  it("switchRole changes active role from instructor to individual", async () => {
-    expect(mockRole).toBe("instructor");
-    await mockSwitchRole("individual");
+describe("single-account migration regressions", () => {
+  it("deprecated switchRole does not change canonical accountType", async () => {
+    await expect(mockSwitchRole("instructor")).rejects.toThrow(/disabled/i);
+    expect(mockAccountType).toBe("freelancer");
     expect(mockRole).toBe("individual");
-    expect(mockSwitchRole).toHaveBeenCalledWith("individual");
+    expect(mockRoles).toEqual(["individual"]);
   });
 
-  it("after switch, role is individual not instructor", async () => {
-    await mockSwitchRole("individual");
-    expect(mockRole).not.toBe("instructor");
-    expect(mockRole).toBe("individual");
-  });
-});
-
-/* ═══════════════════════════════════════════════════════════════
- * 2. Instructor + Student — no stale student state after switch
- * ═══════════════════════════════════════════════════════════════ */
-describe("Instructor + Student switch regression", () => {
-  beforeEach(() => {
-    mockRole = "student";
-    mockRoles = ["student", "instructor"];
+  it("deprecated addRole does not create a new active identity", async () => {
+    const result = await mockAddRole("student");
+    expect(result.error.message).toMatch(/disabled/i);
+    expect(mockAccountType).toBe("freelancer");
+    expect(mockRoles).toEqual(["individual"]);
   });
 
-  it("switchRole changes active role from student to instructor", async () => {
-    expect(mockRole).toBe("student");
-    await mockSwitchRole("instructor");
-    expect(mockRole).toBe("instructor");
-    expect(mockRole).not.toBe("student");
-  });
-
-  it("switchRole changes active role from instructor to student", async () => {
-    mockRole = "instructor";
-    await mockSwitchRole("student");
-    expect(mockRole).toBe("student");
-    expect(mockRole).not.toBe("instructor");
-  });
-});
-
-/* ═══════════════════════════════════════════════════════════════
- * 3. MyRolesSection — pending guard blocks double-click
- * ═══════════════════════════════════════════════════════════════ */
-describe("MyRolesSection action safety", () => {
-  let MyRolesSection: any;
-  beforeEach(async () => {
-    MyRolesSection = (await import("@/components/profile/MyRolesSection")).default;
-  });
-
-  it("renders switch button for non-primary role", () => {
-    mockRole = "instructor";
-    mockRoles = ["instructor", "individual"];
+  it("MyRolesSection exposes single-account framing instead of role-switch controls", async () => {
+    const MyRolesSection = (await import("@/components/profile/MyRolesSection")).default;
     wrap(<MyRolesSection />);
-    expect(screen.getByText("Switch to")).toBeTruthy();
+    expect(screen.getByText("Account Type")).toBeInTheDocument();
+    expect(screen.getByText("Freelancer")).toBeInTheDocument();
+    expect(screen.queryByText(/Switch to/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Set as primary/i)).not.toBeInTheDocument();
   });
 
-  it("disables button while switch is pending", async () => {
-    switchDelay = 200;
-    mockRole = "instructor";
-    mockRoles = ["instructor", "individual"];
-    wrap(<MyRolesSection />);
-    const btn = screen.getByText("Switch to");
-    fireEvent.click(btn);
-    // During pending, button should show loading text
-    await waitFor(() => {
-      expect(screen.getByText("...")).toBeTruthy();
-    });
-  });
-});
-
-/* ═══════════════════════════════════════════════════════════════
- * 4. AccountSettings — pending guard blocks double-click
- * ═══════════════════════════════════════════════════════════════ */
-describe("AccountSettings action safety", () => {
-  let AccountSettings: any;
-  beforeEach(async () => {
-    AccountSettings = (await import("@/pages/AccountSettings")).default;
-  });
-
-  it("renders Set as primary for non-primary roles", () => {
-    mockRole = "instructor";
-    mockRoles = ["instructor", "individual"];
+  it("AccountSettings shows read-only account identity with no role-switch affordance", async () => {
+    const AccountSettings = (await import("@/pages/AccountSettings")).default;
     wrap(<AccountSettings />);
-    expect(screen.getByText("Set as primary")).toBeTruthy();
+    expect(screen.getAllByText("Account Type").length).toBeGreaterThan(0);
+    expect(screen.getByText("Freelancer")).toBeInTheDocument();
+    expect(screen.queryByText(/Roles & Access/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Explore more roles/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Set as primary/i)).not.toBeInTheDocument();
   });
 
-  it("shows loading state during switch", async () => {
-    switchDelay = 200;
-    mockRole = "instructor";
-    mockRoles = ["instructor", "individual"];
-    wrap(<AccountSettings />);
-    const btn = screen.getByText("Set as primary");
-    fireEvent.click(btn);
-    await waitFor(() => {
-      expect(screen.getByText("...")).toBeTruthy();
-    });
+  it("AddRoleDialog stays informational and disabled", async () => {
+    const AddRoleDialog = (await import("@/components/AddRoleDialog")).default;
+    wrap(<AddRoleDialog open onOpenChange={vi.fn()} />);
+    expect(screen.getByText("Not Available")).toBeInTheDocument();
+    expect(screen.getByText(/single account type/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    await waitFor(() => expect(mockAddRole).not.toHaveBeenCalled());
   });
 });

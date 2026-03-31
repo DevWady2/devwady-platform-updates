@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useProfileCompleteness } from "@/hooks/useProfileCompleteness";
@@ -11,18 +11,17 @@ export default function PostLoginRedirect() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const location = useLocation();
-  const switchState = location.state as { roleSwitchTarget?: string; roleSwitchSource?: string } | null;
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate("/login", { replace: true }); return; }
-    if (accountType === null && !authLoading) return;
-
-    // If arriving from a role-switch action, wait until the active accountType matches the target
-    if (switchState?.roleSwitchTarget && accountType !== switchState.roleSwitchTarget) return;
-
     if (scoreLoading) return;
+
+    // Canonical account identity not resolved yet → continue onboarding entry flow
+    if (accountType === null) {
+      navigate("/onboarding", { replace: true });
+      return;
+    }
 
     // Account status checks first
     if (accountStatus === "banned") { navigate("/account-blocked", { replace: true }); return; }
@@ -70,7 +69,7 @@ export default function PostLoginRedirect() {
     } else {
       navigate("/", { replace: true });
     }
-  }, [authLoading, user, accountType, accountStatus, isEmailVerified, score, scoreLoading, navigate, searchParams, switchState?.roleSwitchTarget]);
+  }, [authLoading, user, accountType, accountStatus, isEmailVerified, score, scoreLoading, navigate, searchParams]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">

@@ -17,9 +17,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
-/* ─── role card data ─── */
-interface RoleCardData {
-  role: string;
+/* ─── account type card data ─── */
+interface AccountTypeCardData {
+  accountType: string;
   icon: LucideIcon;
   accentIcon?: LucideIcon;
   badgeColor: string;
@@ -46,9 +46,9 @@ interface RoleCardData {
   applicationPath?: string;
 }
 
-const roleCards: RoleCardData[] = [
+const accountTypeCards: AccountTypeCardData[] = [
   {
-    role: "individual",
+    accountType: "freelancer",
     icon: User,
     badgeColor: "text-green-600",
     badgeBg: "bg-green-500/15",
@@ -85,7 +85,7 @@ const roleCards: RoleCardData[] = [
     selfAddable: true,
   },
   {
-    role: "company",
+    accountType: "company",
     icon: Building2,
     badgeColor: "text-blue-600",
     badgeBg: "bg-blue-500/15",
@@ -123,7 +123,7 @@ const roleCards: RoleCardData[] = [
     selfAddable: false,
   },
   {
-    role: "student",
+    accountType: "student",
     icon: GraduationCap,
     badgeColor: "text-teal-600",
     badgeBg: "bg-teal-500/15",
@@ -158,7 +158,7 @@ const roleCards: RoleCardData[] = [
     selfAddable: true,
   },
   {
-    role: "instructor",
+    accountType: "instructor",
     icon: BookOpen,
     accentIcon: Star,
     badgeColor: "text-amber-600",
@@ -195,7 +195,7 @@ const roleCards: RoleCardData[] = [
     selfAddable: false,
   },
   {
-    role: "expert",
+    accountType: "expert",
     icon: Shield,
     accentIcon: Star,
     badgeColor: "text-purple-600",
@@ -249,6 +249,16 @@ const comparisonRows: { label_en: string; label_ar: string; values: boolean[] }[
   { label_en: "Earn from platform", label_ar: "الربح من المنصة", values: [true, false, false, true, true] },
 ];
 
+
+const accountTypeLabels: Record<string, { en: string; ar: string }> = {
+  freelancer: { en: "Freelancer", ar: "مستقل" },
+  company: { en: "Company", ar: "شركة" },
+  student: { en: "Student", ar: "طالب" },
+  instructor: { en: "Instructor", ar: "مدرب" },
+  expert: { en: "Expert", ar: "خبير" },
+  admin: { en: "Admin", ar: "مشرف" },
+};
+
 const columnHeaders = [
   { en: "Freelancer", ar: "مستقل" },
   { en: "Company", ar: "شركة" },
@@ -268,8 +278,8 @@ const faqs = [
   {
     q_en: "Is it free to join?",
     q_ar: "هل الانضمام مجاني؟",
-    a_en: "Creating an account is free for all roles. Some features (courses, consulting) have their own pricing.",
-    a_ar: "إنشاء حساب مجاني لجميع الأدوار. بعض الميزات (الدورات، الاستشارات) لها أسعارها الخاصة.",
+    a_en: "Creating an account is free for all account types. Some features (courses, consulting) have their own pricing.",
+    a_ar: "إنشاء حساب مجاني لجميع أنواع الحسابات. بعض الميزات (الدورات، الاستشارات) لها أسعارها الخاصة.",
   },
   {
     q_en: "How long does company approval take?",
@@ -294,6 +304,9 @@ export default function Join() {
 
 
   const profileName = user?.user_metadata?.full_name || user?.email?.split("@")[0];
+  const currentAccountTypeLabel = accountType
+    ? (isAr ? accountTypeLabels[accountType]?.ar : accountTypeLabels[accountType]?.en) ?? accountType
+    : null;
 
   const cardVariants = {
     hidden: { opacity: 0, y: 30 },
@@ -306,10 +319,10 @@ export default function Join() {
   return (
     <>
       <SEO
-        title={isAr ? "انضم إلى ديف وادي — اختر مسارك" : "Join DevWady — Choose Your Path"}
+        title={isAr ? "انضم إلى ديف وادي — اختر نوع حسابك" : "Join DevWady — Choose Your Account Type"}
         description={isAr
-          ? "اكتشف جميع الأدوار المتاحة على منصة ديف وادي وانضم بالدور المناسب لك"
-          : "Discover all available roles on DevWady platform and join as the role that fits your goals"}
+          ? "اكتشف أنواع الحسابات المتاحة على منصة ديف وادي واختر ما يناسب أهدافك"
+          : "Discover the available account types on DevWady and choose the one that fits your goals"}
       />
 
       {/* ─── Hero ─── */}
@@ -327,8 +340,8 @@ export default function Join() {
             className="text-lg text-muted-foreground max-w-2xl mx-auto"
           >
             {isAr
-              ? "منصة واحدة، إمكانيات متعددة. انضم بالدور الذي يناسب أهدافك."
-              : "One platform, many possibilities. Join as the role that fits your goals."}
+              ? "منصة واحدة، إمكانيات متعددة. اختر نوع الحساب الذي يناسب أهدافك."
+              : "One platform, many possibilities. Choose the account type that fits your goals."}
           </motion.p>
 
           {user && accountType && (
@@ -338,7 +351,7 @@ export default function Join() {
             >
               <p className="text-muted-foreground">
                 {isAr ? `مرحباً مجدداً، ${profileName}! أنت حالياً ` : `Welcome back, ${profileName}! You're currently a `}
-                <Badge variant="secondary" className="mx-1">{accountType === "freelancer" ? (isAr ? "مستقل" : "Freelancer") : accountType}</Badge>
+                <Badge variant="secondary" className="mx-1">{currentAccountTypeLabel}</Badge>
               </p>
               <p className="text-sm text-muted-foreground">
                 {isAr ? "تعرف على ما يمكن أن تقدمه لك ديف وادي." : "Learn about what DevWady has to offer."}
@@ -348,15 +361,15 @@ export default function Join() {
         </div>
       </section>
 
-      {/* ─── Role Cards ─── */}
+      {/* ─── Account Type Cards ─── */}
       <section className="container mx-auto px-4 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {roleCards.map((card, i) => {
-            const hasRole = accountType === (card.role === "individual" ? "freelancer" : card.role);
+          {accountTypeCards.map((card, i) => {
+            const isCurrentAccountType = accountType === card.accountType;
             const Icon = card.icon;
             return (
               <motion.div
-                key={card.role}
+                key={card.accountType}
                 custom={i}
                 initial="hidden"
                 whileInView="visible"
@@ -364,13 +377,13 @@ export default function Join() {
                 variants={cardVariants}
                 className={cn(
                   i >= 3 && "md:col-span-1",
-                  i === 3 && roleCards.length === 5 && "lg:col-start-1 lg:col-end-2 lg:justify-self-end lg:max-w-[calc(100%-1.5rem)]",
+                  i === 3 && accountTypeCards.length === 5 && "lg:col-start-1 lg:col-end-2 lg:justify-self-end lg:max-w-[calc(100%-1.5rem)]",
                   i === 4 && "lg:col-start-2 lg:col-end-3 lg:justify-self-start lg:max-w-[calc(100%-1.5rem)]",
                 )}
               >
                 <Card className={cn(
                   "h-full flex flex-col border-2 transition-all hover:shadow-lg",
-                  hasRole ? `${card.borderColor} border-s-4` : "border-border hover:border-muted-foreground/30",
+                  isCurrentAccountType ? `${card.borderColor} border-s-4` : "border-border hover:border-muted-foreground/30",
                 )}>
                   <CardContent className="p-6 flex flex-col flex-1 gap-4">
                     {/* Header */}
@@ -386,7 +399,7 @@ export default function Join() {
                           {isAr ? card.title_ar : card.title_en}
                         </Badge>
                       </div>
-                      {hasRole && (
+                      {isCurrentAccountType && (
                         <Badge className="bg-green-500/15 text-green-600 border-0 text-xs">
                           ✓ {isAr ? "مفعّل" : "Active"}
                         </Badge>
@@ -451,7 +464,7 @@ export default function Join() {
                           {isAr ? card.guestCta_ar : card.guestCta_en}
                           <ArrowRight className="icon-flip-rtl h-4 w-4 ms-1 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
                         </Button>
-                      ) : hasRole ? (
+                      ) : isCurrentAccountType ? (
                         /* Already has this account type */
                         <Button variant="outline" className="w-full border-green-500/40 text-green-600" onClick={() => navigate(card.activeDashboard)}>
                           {isAr ? "الذهاب للوحة التحكم" : "Go to Dashboard"} →
@@ -481,7 +494,7 @@ export default function Join() {
           className="max-w-5xl mx-auto"
         >
           <h2 className="text-2xl font-bold text-foreground text-center mb-8">
-            {isAr ? "مقارنة الأدوار" : "Compare Roles"}
+            {isAr ? "مقارنة أنواع الحسابات" : "Compare Account Types"}
           </h2>
           <div className="overflow-x-auto border rounded-xl">
             <table className="w-full text-sm">

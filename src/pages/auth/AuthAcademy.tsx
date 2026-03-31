@@ -6,15 +6,16 @@ import StudentSignupForm from "@/components/auth/StudentSignupForm";
 import InstructorSignupForm from "@/components/auth/InstructorSignupForm";
 import ModuleAuthEntry from "./ModuleAuthEntry";
 import { GraduationCap, BookOpen, Award } from "lucide-react";
+import { normalizeAccountType } from "@/lib/accountType";
 
 export default function AuthAcademy() {
   const { lang } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const role = searchParams.get("role");
+  const requestedAccountType = normalizeAccountType(searchParams.get("accountType") || searchParams.get("role"));
   const redirect = searchParams.get("redirect") || "";
 
-  if (role === "student") {
+  if (requestedAccountType === "student") {
     return (
       <>
         <SEO title={lang === "ar" ? "الوصول إلى الأكاديمية" : "Academy Access"} />
@@ -36,7 +37,7 @@ export default function AuthAcademy() {
     );
   }
 
-  if (role === "instructor") {
+  if (requestedAccountType === "instructor") {
     return (
       <>
         <SEO title={lang === "ar" ? "تقديم طلب مدرب" : "Instructor Application"} />
@@ -58,7 +59,7 @@ export default function AuthAcademy() {
     );
   }
 
-  if (role) {
+  if (searchParams.get("accountType") || searchParams.get("role")) {
     return <Navigate to="/auth/academy" replace />;
   }
 
@@ -86,7 +87,7 @@ export default function AuthAcademy() {
           title_ar: "أنا طالب",
           desc_en: "Enroll in courses, learn from experts, and earn certificates.",
           desc_ar: "سجل في الدورات وتعلم من الخبراء واحصل على شهادات.",
-          path: "/auth/academy?role=student",
+          path: "/auth/academy?accountType=student",
           variant: "primary",
         },
         {
@@ -95,7 +96,7 @@ export default function AuthAcademy() {
           title_ar: "أنا مدرب",
           desc_en: "Apply to teach on DevWady Academy or sign in to your teaching dashboard.",
           desc_ar: "قدم للتدريس على أكاديمية ديف وادي أو سجل دخولك.",
-          path: "/auth/academy?role=instructor",
+          path: "/auth/academy?accountType=instructor",
           badge_en: "Application required",
           badge_ar: "يتطلب تقديم طلب",
         },

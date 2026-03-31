@@ -105,6 +105,7 @@ export default function StudentSignupForm({ onBack, redirect: _redirect = "" }: 
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      // Legacy user_roles write is kept only as a temporary compatibility bridge.
       await supabase.from("user_roles").insert({ user_id: user.id, role: "student" });
       if (withGoals && (selectedInterests.length || level || weeklyTime)) {
         const updates: Record<string, any> = {};
@@ -143,7 +144,7 @@ export default function StudentSignupForm({ onBack, redirect: _redirect = "" }: 
     <div className="w-full max-w-md mx-auto">
       <button onClick={step === 1 ? onBack : () => setStep(s => s - 1)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
         <ArrowLeft className="icon-flip-rtl h-4 w-4" />
-        {step === 1 ? (isAr ? "العودة لاختيار نوع الحساب" : "Back to role selection") : (isAr ? "السابق" : "Back")}
+        {step === 1 ? (isAr ? "العودة لاختيار نوع الحساب" : "Back to account type selection") : (isAr ? "السابق" : "Back")}
       </button>
 
       {/* Step indicator */}

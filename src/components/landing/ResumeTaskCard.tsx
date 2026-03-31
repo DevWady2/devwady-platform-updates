@@ -31,18 +31,18 @@ interface ResumeItem {
 
 export default function ResumeTaskCard() {
   const { lang } = useLanguage();
-  const { user, role } = useAuth();
+  const { user, accountType } = useAuth();
   const isAr = lang === "ar";
 
   const { data: resumeItem } = useQuery({
-    queryKey: ["resume-task", user?.id, role],
-    enabled: !!user,
+    queryKey: ["resume-task", user?.id, accountType],
+    enabled: !!user && !!accountType,
     staleTime: 60_000,
     queryFn: async (): Promise<ResumeItem | null> => {
       const uid = user!.id;
-      const r = role ?? "individual";
+      const currentAccountType = accountType ?? "freelancer";
 
-      if (r === "company") {
+      if (currentAccountType === "company") {
         const { data: quote } = await supabase
           .from("quotes").select("id, title, service_request_id")
           .eq("status", "pending").order("created_at", { ascending: false })
@@ -69,13 +69,13 @@ export default function ResumeTaskCard() {
         }
       }
 
-      if (r === "individual") {
+      if (currentAccountType === "freelancer") {
         const { data: profile } = await supabase
           .from("profiles").select("full_name, bio, skills, avatar_url")
           .eq("user_id", uid).maybeSingle();
         const missing = profile && (!profile.bio || !profile.skills || !profile.avatar_url);
         if (missing) {
-          const target = getFallback("individual", "profile");
+          const target = getFallback("freelancer", "profile");
           return { icon: User, title_en: "Complete your profile", title_ar: "أكمل ملفك الشخصي", desc_en: "A complete profile helps you stand out to employers", desc_ar: "الملف الكامل يساعدك على التميز أمام أصحاب العمل", cta_en: target.label_en, cta_ar: target.label_ar, path: target.path };
         }
         const { data: app } = await supabase
@@ -83,12 +83,12 @@ export default function ResumeTaskCard() {
           .eq("applicant_user_id", uid).order("created_at", { ascending: false })
           .limit(1).maybeSingle();
         if (app) {
-          const target = getFallback("individual", "applications");
+          const target = getFallback("freelancer", "applications");
           return { icon: Briefcase, title_en: "Track your latest application", title_ar: "تتبع آخر طلب تقدمت له", desc_en: `Status: ${app.status}`, desc_ar: `الحالة: ${app.status}`, cta_en: target.label_en, cta_ar: target.label_ar, path: target.path };
         }
       }
 
-      if (r === "expert") {
+      if (currentAccountType === "expert") {
         const { data: session } = await supabase
           .from("consulting_bookings").select("id, booking_date, start_time")
           .eq("expert_id", uid).in("status", ["confirmed", "pending"])
@@ -100,7 +100,7 @@ export default function ResumeTaskCard() {
         }
       }
 
-      if (r === "student") {
+      if (currentAccountType === "student") {
         const { data: enrollment } = await supabase
           .from("course_enrollments").select("id, course_id")
           .eq("user_id", uid).eq("status", "active")
@@ -111,7 +111,7 @@ export default function ResumeTaskCard() {
         }
       }
 
-      if (r === "instructor") {
+      if (currentAccountType === "instructor") {
         const { data: course } = await supabase
           .from("training_courses").select("id, title_en")
           .eq("instructor_id", uid).eq("status", "draft")

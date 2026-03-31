@@ -40,12 +40,12 @@ describe("Talent freelancer profile, portfolio, and shared settings", () => {
   });
 
   it("shows company-specific settings tiles only for company roles", () => {
-    mockUseAuth.mockReturnValue({ roles: ["company"], role: "company" } as any);
+    mockUseAuth.mockReturnValue({ accountType: "company", role: "company", roles: ["company"] } as any);
     renderAtPath(<TalentSettings />, "/talent/portal/company/settings");
     expect(screen.getByText("Company Profile")).toBeInTheDocument();
     expect(screen.getByText("Team Members")).toBeInTheDocument();
 
-    mockUseAuth.mockReturnValue({ roles: ["individual"], role: "individual" } as any);
+    mockUseAuth.mockReturnValue({ accountType: "freelancer", role: "individual", roles: ["individual"] } as any);
     renderAtPath(<TalentSettings />, "/talent/portal/freelancer/settings");
     expect(screen.queryByText("Company Profile")).not.toBeInTheDocument();
     expect(screen.getByText("Profile Settings")).toBeInTheDocument();

@@ -38,7 +38,9 @@ describe('PostLoginRedirect', () => {
   it('redirects unauthenticated users to login', async () => {
     mockUseAuth.mockReturnValue({
       user: null,
+      accountType: null,
       role: null,
+      roles: [],
       accountStatus: null,
       isEmailVerified: false,
       loading: false,
@@ -53,10 +55,12 @@ describe('PostLoginRedirect', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/login', { replace: true }));
   });
 
-  it('sends low-completeness individuals to freelancer onboarding', async () => {
+  it('sends low-completeness freelancers to freelancer onboarding', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'u1' },
+      accountType: 'freelancer',
       role: 'individual',
+      roles: ['individual'],
       accountStatus: 'active',
       isEmailVerified: true,
       loading: false,
@@ -75,7 +79,9 @@ describe('PostLoginRedirect', () => {
   it('routes verified companies with complete profiles to the enterprise portal', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'u1' },
+      accountType: 'company',
       role: 'company',
+      roles: ['company'],
       accountStatus: 'active',
       isEmailVerified: true,
       loading: false,
@@ -93,7 +99,9 @@ describe('PostLoginRedirect', () => {
   it('sends unverified non-admin users to verify-email', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'u1' },
+      accountType: 'company',
       role: 'company',
+      roles: ['company'],
       accountStatus: 'active',
       isEmailVerified: false,
       loading: false,
@@ -111,7 +119,9 @@ describe('PostLoginRedirect', () => {
   it('honors redirect param once profile score is sufficient', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'u1' },
+      accountType: 'company',
       role: 'company',
+      roles: ['company'],
       accountStatus: 'active',
       isEmailVerified: true,
       loading: false,

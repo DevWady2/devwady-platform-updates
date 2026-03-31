@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getDefaultCapabilities, isAdminUser, legacyRoleFromAccountType, normalizeAccountType, syncLegacyRoleBridge } from "../_shared/account-identity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,40 +36,77 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check admin role
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roleData } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
-      .eq("role", "admin")
-      .maybeSingle();
+    const isAdmin = await isAdminUser(adminClient, caller.id);
 
-    if (!roleData) {
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { action, user_id, reason } = await req.json();
+    const body = await req.json();
+    const {
+      action,
+      user_id,
+      reason,
+      account_type,
+      capabilities,
+      approval_status,
+      badges,
+      entitlements,
+      account_status,
+    } = body;
 
-    if (!action || !user_id) {
-      return new Response(JSON.stringify({ error: "Missing action or user_id" }), {
+    if (!user_id) {
+      return new Response(JSON.stringify({ error: "Missing user_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    let newStatus: string;
-    let notificationTitle_en: string;
-    let notificationTitle_ar: string;
+    const canonicalAccountType = normalizeAccountType(account_type);
+    const { data: existingProfile } = await adminClient
+      .from("profiles")
+      .select("account_type")
+      .eq("user_id", user_id)
+      .maybeSingle();
+    const resolvedExistingAccountType = normalizeAccountType(existingProfile?.account_type);
+    const profilePatch: Record<string, unknown> = {};
+    const syncNotes: string[] = [];
+
+    if (canonicalAccountType) {
+      profilePatch.account_type = canonicalAccountType;
+      if (Array.isArray(capabilities)) {
+        profilePatch.capabilities = capabilities.filter(Boolean);
+      } else {
+        profilePatch.capabilities = await getDefaultCapabilities(adminClient, canonicalAccountType);
+      }
+    } else if (Array.isArray(capabilities)) {
+      profilePatch.capabilities = capabilities.filter(Boolean);
+    }
+
+    if (account_status) profilePatch.account_status = account_status;
+    if (typeof approval_status !== "undefined") profilePatch.approval_status = approval_status;
+    if (typeof badges !== "undefined") profilePatch.badges = badges;
+    if (typeof entitlements !== "undefined") profilePatch.entitlements = entitlements;
+
+    let newStatus: string | null = null;
+    let notificationTitle_en: string | null = null;
+    let notificationTitle_ar: string | null = null;
     let notificationBody_en: string | null = null;
     let notificationBody_ar: string | null = null;
 
     switch (action) {
+      case undefined:
+      case null:
+      case "":
+        break;
       case "approve":
         newStatus = "active";
+        profilePatch.account_status = newStatus;
+        profilePatch.approval_status = "approved";
         notificationTitle_en = "Your account has been approved!";
         notificationTitle_ar = "تم الموافقة على حسابك!";
         notificationBody_en = "You now have full access to DevWady.";
@@ -76,6 +114,7 @@ Deno.serve(async (req) => {
         break;
       case "activate":
         newStatus = "active";
+        profilePatch.account_status = newStatus;
         notificationTitle_en = "Your account has been reactivated";
         notificationTitle_ar = "تم إعادة تفعيل حسابك";
         break;
@@ -87,6 +126,7 @@ Deno.serve(async (req) => {
           });
         }
         newStatus = "suspended";
+        profilePatch.account_status = newStatus;
         notificationTitle_en = "Your account has been suspended";
         notificationTitle_ar = "تم تعليق حسابك";
         notificationBody_en = reason;
@@ -100,6 +140,7 @@ Deno.serve(async (req) => {
           });
         }
         newStatus = "banned";
+        profilePatch.account_status = newStatus;
         notificationTitle_en = "Your account has been disabled";
         notificationTitle_ar = "تم تعطيل حسابك";
         notificationBody_en = reason;
@@ -107,6 +148,7 @@ Deno.serve(async (req) => {
         break;
       case "unban":
         newStatus = "active";
+        profilePatch.account_status = newStatus;
         notificationTitle_en = "Your account has been restored";
         notificationTitle_ar = "تم استعادة حسابك";
         break;
@@ -117,26 +159,33 @@ Deno.serve(async (req) => {
         });
     }
 
-    // Update profile
-    const { error: updateError } = await adminClient
-      .from("profiles")
-      .update({
-        account_status: newStatus,
-        status_reason: reason || null,
-        status_changed_at: new Date().toISOString(),
-        status_changed_by: caller.id,
-      })
-      .eq("user_id", user_id);
+    if (Object.keys(profilePatch).length > 0) {
+      if (action || account_status) {
+        profilePatch.status_reason = reason || null;
+        profilePatch.status_changed_at = new Date().toISOString();
+        profilePatch.status_changed_by = caller.id;
+      }
 
-    if (updateError) {
-      return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const { error: updateError } = await adminClient
+        .from("profiles")
+        .upsert({ user_id, ...profilePatch }, { onConflict: "user_id" });
+
+      if (updateError) {
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (canonicalAccountType) {
+      const legacySync = await syncLegacyRoleBridge(adminClient, user_id, canonicalAccountType);
+      if (!legacySync.synced) syncNotes.push(legacySync.reason);
     }
 
     // For approve action on company accounts, verify the company
-    if (action === "approve") {
+    const resolvedAccountType = canonicalAccountType || resolvedExistingAccountType || normalizeAccountType((profilePatch.account_type as string | undefined) || null);
+    if (action === "approve" && resolvedAccountType === "company") {
       await adminClient
         .from("company_profiles")
         .update({ is_verified: true })
@@ -155,7 +204,7 @@ Deno.serve(async (req) => {
     }
 
     // Create notification (skip for banned users — they can't see it)
-    if (action !== "ban") {
+    if (action && action !== "ban" && notificationTitle_en && notificationTitle_ar) {
       try {
         await adminClient.rpc("create_notification", {
           _user_id: user_id,
@@ -172,7 +221,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, new_status: newStatus }), {
+    return new Response(JSON.stringify({
+      success: true,
+      new_status: newStatus || profilePatch.account_status || null,
+      account_type: canonicalAccountType || resolvedExistingAccountType || null,
+      role: legacyRoleFromAccountType(canonicalAccountType || resolvedExistingAccountType),
+      capabilities: Array.isArray(profilePatch.capabilities) ? profilePatch.capabilities : undefined,
+      approval_status: typeof profilePatch.approval_status === "undefined" ? null : profilePatch.approval_status,
+      sync_notes: syncNotes,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

@@ -290,7 +290,7 @@ const App = () => (
                 <Route path="/onboarding/freelancer" element={<Layout><AuthGuard><FreelancerOnboarding /></AuthGuard></Layout>} />
                 <Route path="/onboarding/student" element={<Layout><AuthGuard><StudentOnboarding /></AuthGuard></Layout>} />
 
-                {/* ── Legacy role-specific redirects ── */}
+                {/* ── Legacy bookmarked redirects ── */}
                 <Route path="/company" element={<Navigate to="/enterprise/portal" replace />} />
                 <Route path="/company/profile" element={<Navigate to="/enterprise/portal/company-profile" replace />} />
                 <Route path="/company/jobs" element={<Navigate to="/talent/portal/company/jobs" replace />} />
@@ -306,18 +306,18 @@ const App = () => (
                 <Route path="/expert/profile" element={<Navigate to="/consulting/portal/profile" replace />} />
                 <Route path="/expert/earnings" element={<Navigate to="/consulting/portal/earnings" replace />} />
 
-                <Route path="/student/dashboard" element={<Navigate to="/academy" replace />} />
+                <Route path="/student/dashboard" element={<Navigate to="/academy/portal" replace />} />
 
                 {/* Instructor redirects → workspace */}
                 <Route path="/instructor/dashboard" element={<Navigate to="/instructor/courses" replace />} />
                 <Route path="/instructor/earnings" element={<Navigate to="/instructor/workspace/earnings" replace />} />
 
                 {/* ── Instructor website-layer pages ── */}
-                <Route path="/instructor/jobs" element={<Layout><AuthGuard><RoleGuard allowedRoles={['instructor', 'admin']}><InstructorJobs /></RoleGuard></AuthGuard></Layout>} />
-                <Route path="/instructor/courses" element={<Layout><AuthGuard><RoleGuard allowedRoles={['instructor', 'admin']}><InstructorCoursesPage /></RoleGuard></AuthGuard></Layout>} />
-                <Route path="/instructor/courses/:slug" element={<Layout><AuthGuard><RoleGuard allowedRoles={['instructor', 'admin']}><InstructorCourseDetail /></RoleGuard></AuthGuard></Layout>} />
-                <Route path="/instructor/questions" element={<Layout><AuthGuard><RoleGuard allowedRoles={['instructor', 'admin']}><InstructorQuestions /></RoleGuard></AuthGuard></Layout>} />
-                <Route path="/instructor/assistants" element={<Layout><AuthGuard><RoleGuard allowedRoles={['instructor', 'admin']}><InstructorAssistants /></RoleGuard></AuthGuard></Layout>} />
+                <Route path="/instructor/jobs" element={<Layout><AuthGuard><RoleGuard allowedAccountTypes={['instructor', 'admin']}><InstructorJobs /></RoleGuard></AuthGuard></Layout>} />
+                <Route path="/instructor/courses" element={<Layout><AuthGuard><RoleGuard allowedAccountTypes={['instructor', 'admin']}><InstructorCoursesPage /></RoleGuard></AuthGuard></Layout>} />
+                <Route path="/instructor/courses/:slug" element={<Layout><AuthGuard><RoleGuard allowedAccountTypes={['instructor', 'admin']}><InstructorCourseDetail /></RoleGuard></AuthGuard></Layout>} />
+                <Route path="/instructor/questions" element={<Layout><AuthGuard><RoleGuard allowedAccountTypes={['instructor', 'admin']}><InstructorQuestions /></RoleGuard></AuthGuard></Layout>} />
+                <Route path="/instructor/assistants" element={<Layout><AuthGuard><RoleGuard allowedAccountTypes={['instructor', 'admin']}><InstructorAssistants /></RoleGuard></AuthGuard></Layout>} />
 
                 {/* Cross-portal routes kept as-is + redirect old paths to workspace */}
                 <Route path="/learn/:slug" element={<AuthGuard><CourseLearning /></AuthGuard>} />

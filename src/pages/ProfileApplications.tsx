@@ -24,7 +24,7 @@ const statusConfig: Record<string, { color: string; icon: typeof Clock }> = {
 };
 
 export default function ProfileApplications() {
-  const { user, loading: authLoading, role } = useAuth();
+  const { user, loading: authLoading, accountType, role } = useAuth();
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const isAr = lang === "ar";
@@ -34,8 +34,8 @@ export default function ProfileApplications() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate("/login"); return; }
-    if (role !== "individual" && role !== "admin") { navigate("/"); return; }
-  }, [user, authLoading, role]);
+    if (!(accountType === "freelancer" || accountType === "admin" || (!accountType && (role === "individual" || role === "admin")))) { navigate("/"); return; }
+  }, [user, authLoading, accountType, role]);
 
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ["my-applications", user?.id],

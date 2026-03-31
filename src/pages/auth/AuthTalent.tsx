@@ -6,29 +6,30 @@ import CompanySignupForm from "@/components/auth/CompanySignupForm";
 import FreelancerSignupForm from "@/components/auth/FreelancerSignupForm";
 import ModuleAuthEntry from "./ModuleAuthEntry";
 import { Users, Building2, UserCheck } from "lucide-react";
+import { normalizeAccountType } from "@/lib/accountType";
 
 export default function AuthTalent() {
   const { lang } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const role = searchParams.get("role");
+  const requestedAccountType = normalizeAccountType(searchParams.get("accountType") || searchParams.get("role"));
   const redirect = searchParams.get("redirect") || "";
 
-  if (role === "company" || role === "individual") {
+  if (requestedAccountType === "company" || requestedAccountType === "freelancer") {
     return (
       <>
         <SEO title={lang === "ar" ? "الوصول إلى تالنت" : "Talent Access"} />
         <section className="min-h-[80vh] flex items-center justify-center py-16 px-4">
           <AnimatePresence mode="wait">
             <motion.div
-              key={role}
+              key={requestedAccountType}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
               className="w-full max-w-md mx-auto"
             >
-              {role === "company" ? (
+              {requestedAccountType === "company" ? (
                 <CompanySignupForm onBack={() => navigate("/auth/talent")} redirect={redirect} />
               ) : (
                 <FreelancerSignupForm onBack={() => navigate("/auth/talent")} redirect={redirect} />
@@ -40,7 +41,7 @@ export default function AuthTalent() {
     );
   }
 
-  if (role) {
+  if (searchParams.get("accountType") || searchParams.get("role")) {
     return <Navigate to="/auth/talent" replace />;
   }
 
@@ -68,7 +69,7 @@ export default function AuthTalent() {
           title_ar: "أريد توظيف مواهب",
           desc_en: "Post jobs, browse vetted profiles, and manage your hiring pipeline.",
           desc_ar: "انشر وظائف وتصفح ملفات معتمدة وأدر خط التوظيف.",
-          path: "/auth/talent?role=company",
+          path: "/auth/talent?accountType=company",
           variant: "primary",
         },
         {
@@ -77,7 +78,7 @@ export default function AuthTalent() {
           title_ar: "أنا مستقل / مطور",
           desc_en: "Create your profile, apply to jobs, and get matched with top companies.",
           desc_ar: "أنشئ ملفك وقدم على الوظائف واحصل على مطابقة مع أفضل الشركات.",
-          path: "/auth/talent?role=individual",
+          path: "/auth/talent?accountType=freelancer",
         },
       ]}
     />

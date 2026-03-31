@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAdminUser, legacyRoleFromAccountType, normalizeAccountType } from "../_shared/account-identity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,16 +37,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check admin role
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roleData } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id)
-      .eq("role", "admin")
-      .maybeSingle();
+    const isAdmin = await isAdminUser(adminClient, caller.id);
 
-    if (!roleData) {
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -64,16 +59,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get all roles
-    const { data: roles } = await adminClient.from("user_roles").select("*");
+    // Compatibility bridge only; canonical identity comes from profiles first.
+    const { data: roleRows } = await adminClient.from("user_roles").select("id, user_id, role");
 
-    // Get all profiles
-    const { data: profiles } = await adminClient.from("profiles").select("*");
+    const { data: profiles } = await adminClient
+      .from("profiles")
+      .select("user_id, full_name, avatar_url, account_type, capabilities, approval_status, badges, entitlements, account_status, status_reason, status_changed_at, status_changed_by");
 
-    // Merge data
+    const profileMap = new Map((profiles || []).map((profile: any) => [profile.user_id, profile]));
+    const groupedRoles = new Map<string, any[]>();
+    for (const row of roleRows || []) {
+      const bucket = groupedRoles.get(row.user_id) || [];
+      bucket.push(row);
+      groupedRoles.set(row.user_id, bucket);
+    }
+
     const enriched = users.map((u: any) => {
-      const userRole = roles?.find((r: any) => r.user_id === u.id);
-      const profile = profiles?.find((p: any) => p.user_id === u.id);
+      const profile = profileMap.get(u.id);
+      const candidateRoles = groupedRoles.get(u.id) || [];
+      const primaryRole = candidateRoles.find((row: any) => row.role !== "admin") || candidateRoles[0] || null;
+      const canonicalAccountType = normalizeAccountType(profile?.account_type) || normalizeAccountType(primaryRole?.role);
+      const compatibilityRole = legacyRoleFromAccountType(canonicalAccountType) || primaryRole?.role || null;
+
       return {
         id: u.id,
         email: u.email,
@@ -82,9 +89,15 @@ Deno.serve(async (req) => {
         email_confirmed_at: u.email_confirmed_at,
         full_name: profile?.full_name || u.user_metadata?.full_name || null,
         avatar_url: profile?.avatar_url || null,
-        role: userRole?.role || null,
-        role_id: userRole?.id || null,
-        account_status: profile?.account_status || 'active',
+        account_type: canonicalAccountType,
+        capabilities: profile?.capabilities || [],
+        approval_status: profile?.approval_status || null,
+        badges: profile?.badges || null,
+        entitlements: profile?.entitlements || null,
+        role: compatibilityRole,
+        roles: compatibilityRole ? [compatibilityRole] : [],
+        role_id: primaryRole?.id || null,
+        account_status: profile?.account_status || "active",
         status_reason: profile?.status_reason || null,
         status_changed_at: profile?.status_changed_at || null,
         status_changed_by: profile?.status_changed_by || null,

@@ -91,7 +91,7 @@ export function useNavConfig(): NavConfig {
             { path: "/academy/courses", label_en: "Learning", label_ar: "التعلّم" },
           ]),
           primaryCTA: { path: "/hiring", label_en: "Browse Jobs", label_ar: "تصفح الوظائف", variant: "primary" as const },
-          secondaryCTA: { path: "/talent/portal", label_en: "Workspace", label_ar: "مساحة العمل", variant: "secondary" as const },
+          secondaryCTA: { path: "/talent/portal/freelancer", label_en: "Workspace", label_ar: "مساحة العمل", variant: "secondary" as const },
         };
 
       case "expert":

@@ -25,16 +25,16 @@ interface Suggestion {
 
 export default function SuggestedNextSteps() {
   const { lang } = useLanguage();
-  const { user, role } = useAuth();
+  const { user, accountType } = useAuth();
   const isAr = lang === "ar";
 
   const { data: suggestions = [] } = useQuery({
-    queryKey: ["suggested-steps", user?.id, role],
-    enabled: !!user,
+    queryKey: ["suggested-steps", user?.id, accountType],
+    enabled: !!user && !!accountType,
     staleTime: 2 * 60_000,
     queryFn: async (): Promise<Suggestion[]> => {
       const uid = user!.id;
-      const r = role ?? "individual";
+      const currentAccountType = accountType ?? "freelancer";
       const items: Suggestion[] = [];
 
       const { data: profile } = await supabase
@@ -42,13 +42,13 @@ export default function SuggestedNextSteps() {
         .eq("user_id", uid).maybeSingle();
 
       if (profile && !profile.avatar_url) {
-        items.push({ icon: Upload, label_en: "Add a profile photo", label_ar: "أضف صورة للملف", path: getFallback(r, "profile").path || "/profile/edit", priority: 1 });
+        items.push({ icon: Upload, label_en: "Add a profile photo", label_ar: "أضف صورة للملف", path: getFallback(currentAccountType, "profile").path || "/profile/edit", priority: 1 });
       }
       if (profile && !profile.bio) {
         items.push({ icon: User, label_en: "Write your bio", label_ar: "اكتب نبذة عنك", path: "/profile/edit", priority: 2 });
       }
 
-      if (r === "company") {
+      if (currentAccountType === "company") {
         const { data: pendingQuotes } = await supabase
           .from("quotes").select("id", { count: "exact", head: false })
           .eq("status", "pending").limit(5);
@@ -62,7 +62,7 @@ export default function SuggestedNextSteps() {
         }
       }
 
-      if (r === "expert") {
+      if (currentAccountType === "expert") {
         const { count } = await supabase
           .from("expert_availability").select("id", { count: "exact", head: true })
           .eq("expert_id", uid).eq("is_active", true);
@@ -72,7 +72,7 @@ export default function SuggestedNextSteps() {
         }
       }
 
-      if (r === "student") {
+      if (currentAccountType === "student") {
         const { data: enrollment } = await supabase
           .from("course_enrollments").select("id, course_id")
           .eq("user_id", uid).eq("status", "active").limit(1).maybeSingle();
@@ -82,7 +82,7 @@ export default function SuggestedNextSteps() {
         }
       }
 
-      if (r === "instructor") {
+      if (currentAccountType === "instructor") {
         const { count } = await supabase
           .from("training_courses").select("id", { count: "exact", head: true })
           .eq("instructor_id", uid).eq("status", "draft");

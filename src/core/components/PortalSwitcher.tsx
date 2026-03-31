@@ -1,11 +1,11 @@
 /**
- * PortalSwitcher — Dropdown that lets multi-role users switch between
- * their available portals without navigating back to the homepage.
+ * PortalSwitcher — Quick portal launcher for the portals this account can access.
+ * It does not switch identity; it only jumps between accessible portal surfaces.
  */
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { PORTAL_LIST, type PortalConfig } from "@/core/portals/registry";
+import { PORTAL_LIST, canAccessPortal, type PortalConfig } from "@/core/portals/registry";
 import { ChevronDown, ArrowRightLeft } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,18 +22,18 @@ interface PortalSwitcherProps {
 }
 
 export default function PortalSwitcher({ currentPortal }: PortalSwitcherProps) {
-  const { roles } = useAuth();
+  const { accountType, capabilities, role } = useAuth();
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const isAr = lang === "ar";
 
-  // Filter portals: must require auth, user must hold at least one allowed role, exclude current
+  // Filter portals canonically: accountType first, capability hints second, legacy role only as fallback
   const availablePortals = PORTAL_LIST.filter(
     (p) =>
       p.requiresAuth &&
       p.id !== currentPortal.id &&
-      p.allowedRoles.some((r) => roles.includes(r))
+      canAccessPortal(p, { accountType, capabilities, role })
   );
 
   // Don't render if user only has access to the current portal
@@ -49,14 +49,14 @@ export default function PortalSwitcher({ currentPortal }: PortalSwitcherProps) {
         >
           <ArrowRightLeft className="h-3.5 w-3.5" />
           <span className="hidden md:inline">
-            {isAr ? "تبديل البوابة" : "Switch"}
+            {isAr ? "البوابات" : "Portals"}
           </span>
           <ChevronDown className="h-3 w-3 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          {isAr ? "البوابات المتاحة" : "Switch Portal"}
+          {isAr ? "البوابات المتاحة" : "Available Portals"}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {availablePortals.map((portal) => {

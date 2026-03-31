@@ -3,10 +3,10 @@ import { screen } from "@testing-library/react";
 import ConsultingDashboard from "@/portals/consulting/pages/ConsultingDashboard";
 import { renderInRouter } from "./consulting-test-utils";
 
-const rolesState = vi.hoisted(() => ({ roles: ["individual"] as string[] }));
+const authState = vi.hoisted(() => ({ accountType: "freelancer", role: "individual", roles: ["individual"] as string[] }));
 
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ roles: rolesState.roles }),
+  useAuth: () => authState,
 }));
 
 vi.mock("@/portals/consulting/pages/ConsultingExpertDashboard", () => ({
@@ -18,20 +18,26 @@ vi.mock("@/portals/consulting/pages/ConsultingClientDashboard", () => ({
 }));
 
 describe("ConsultingDashboard router", () => {
-  it("renders expert dashboard for expert role", () => {
-    rolesState.roles = ["expert"];
+  it("renders expert dashboard for expert account types", () => {
+    authState.accountType = "expert";
+    authState.role = "expert";
+    authState.roles = ["expert"];
     renderInRouter(<ConsultingDashboard />);
     expect(screen.getByText("expert-dashboard-view")).toBeInTheDocument();
   });
 
-  it("renders expert dashboard for admin role", () => {
-    rolesState.roles = ["admin"];
+  it("renders expert dashboard for admin account types", () => {
+    authState.accountType = "admin";
+    authState.role = "admin";
+    authState.roles = ["admin"];
     renderInRouter(<ConsultingDashboard />);
     expect(screen.getByText("expert-dashboard-view")).toBeInTheDocument();
   });
 
-  it("renders client dashboard for non-expert roles", () => {
-    rolesState.roles = ["individual"];
+  it("renders client dashboard for freelancer accounts via the legacy role shim", () => {
+    authState.accountType = "freelancer";
+    authState.role = "individual";
+    authState.roles = ["individual"];
     renderInRouter(<ConsultingDashboard />);
     expect(screen.getByText("client-dashboard-view")).toBeInTheDocument();
   });

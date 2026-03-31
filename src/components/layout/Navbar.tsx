@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { flushSync } from "react-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, type AccountType } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -54,9 +54,9 @@ interface MenuItem {
 }
 
 /* workspace items — shown at the top with visual separation */
-const roleWorkspaceItems: Record<string, MenuItem[]> = {
-  individual: [
-    { path: "/talent/portal/freelancer", icon: Users, label_en: "Talent Workspace", label_ar: "مساحة المواهب" },
+const accountTypeWorkspaceItems: Record<AccountType, MenuItem[]> = {
+  freelancer: [
+    { path: "/talent/portal/freelancer", icon: Users, label_en: "Freelancer Workspace", label_ar: "مساحة المستقل" },
   ],
   company: [
     { path: "/enterprise/portal", icon: Rocket, label_en: "Enterprise Workspace", label_ar: "مساحة إنتربرايز" },
@@ -76,8 +76,8 @@ const roleWorkspaceItems: Record<string, MenuItem[]> = {
 
 /* regular menu items — profile, settings & account utilities only.
    Role-specific pages are now in the center nav bar. */
-const roleMenuItems: Record<string, MenuItem[]> = {
-  individual: [
+const accountTypeMenuItems: Record<AccountType, MenuItem[]> = {
+  freelancer: [
     { path: "/profile", icon: User, label_en: "My Profile", label_ar: "ملفي الشخصي" },
     { path: "/profile/edit", icon: Settings, label_en: "Edit Profile", label_ar: "تعديل الملف" },
     { path: "/profile/payments", icon: CreditCard, label_en: "Payments", label_ar: "المدفوعات" },
@@ -176,7 +176,7 @@ function MegaMenuPanel({
 export default function Navbar() {
   const { t, lang, setLang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { user, signOut, role, accountStatus, accountType } = useAuth();
+  const { user, signOut, accountStatus, accountType } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -281,14 +281,14 @@ export default function Navbar() {
     ? navProfile.full_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : (user?.email?.[0]?.toUpperCase() ?? "U");
 
-  const workspaceItems: MenuItem[] = role ? (roleWorkspaceItems[role] || []) : [];
-  const menuItems: MenuItem[] = role ? (roleMenuItems[role] || roleMenuItems.individual) : [];
+  const workspaceItems: MenuItem[] = accountType ? (accountTypeWorkspaceItems[accountType] || []) : [];
+  const menuItems: MenuItem[] = accountType ? (accountTypeMenuItems[accountType] || accountTypeMenuItems.freelancer) : [];
 
   const crossRoleItems: MenuItem[] = [];
-  if (enrollmentCount && enrollmentCount > 0 && role !== "student" && role !== "instructor") {
+  if (enrollmentCount && enrollmentCount > 0 && accountType !== "student" && accountType !== "instructor") {
     crossRoleItems.push({ path: "/my/learning", icon: BookOpen, label_en: "My Courses", label_ar: "دوراتي" });
   }
-  if (serviceRequestCount && serviceRequestCount > 0 && role !== "instructor") {
+  if (serviceRequestCount && serviceRequestCount > 0 && accountType !== "instructor") {
     crossRoleItems.push({ path: "/enterprise/portal/projects", icon: FolderOpen, label_en: "My Projects", label_ar: "مشاريعي" });
   }
 
@@ -328,7 +328,7 @@ export default function Navbar() {
   const renderMenuItemLink = (item: MenuItem) => {
     const Icon = item.icon;
     const label = isAr ? item.label_ar : item.label_en;
-    const showBadge = item.path === "/my/learning" && role === "student" && enrollmentCount && enrollmentCount > 0;
+    const showBadge = item.path === "/my/learning" && accountType === "student" && enrollmentCount && enrollmentCount > 0;
     return (
       <Link to={item.path} className={`flex items-center gap-2 cursor-pointer ${item.destructive ? "text-destructive" : ""}`}>
         <Icon className="h-4 w-4" /> {label}
@@ -434,7 +434,7 @@ export default function Navbar() {
                   </div>
                 )}
 
-                {/* Role-aware direct links */}
+                {/* Account-aware direct links */}
                 {navConfig.links.map((link) => (
                   <Link
                     key={`${link.path}-${link.label_en}`}
@@ -722,7 +722,7 @@ export default function Navbar() {
 
                   <div className="h-px bg-border/50 my-2" />
 
-                  {/* Role-aware nav links (skip Home — already rendered above) */}
+                  {/* Account-aware nav links (skip Home — already rendered above) */}
                   {navConfig.links
                     .filter((link) => link.path !== "/")
                     .map((link) => (

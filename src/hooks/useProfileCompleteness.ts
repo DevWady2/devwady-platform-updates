@@ -1,9 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeAccountType, type CanonicalAccountType, type LegacyAppRole } from "@/lib/accountType";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-
-type AppRole = "individual" | "company" | "admin" | "expert" | "student" | "instructor";
 
 interface ProfileCompleteness {
   score: number;
@@ -83,11 +82,13 @@ const labels = {
 
 const has = (v: unknown): boolean => typeof v === "string" && v.length > 0;
 
-export function useProfileCompleteness(forRole?: AppRole): ProfileCompleteness {
-  const { user, role: primaryRole, loading: authLoading } = useAuth();
+type CompletenessTarget = CanonicalAccountType | LegacyAppRole;
+
+export function useProfileCompleteness(forAccountType?: CompletenessTarget): ProfileCompleteness {
+  const { user, accountType: primaryAccountType, role: legacyRole, loading: authLoading } = useAuth();
   const { lang } = useLanguage();
   const l = labels[lang] ?? labels.en;
-  const targetRole = forRole ?? primaryRole;
+  const targetAccountType = normalizeAccountType(forAccountType) ?? primaryAccountType ?? normalizeAccountType(legacyRole);
 
   const { data: profile, isLoading: pLoading } = useQuery({
     queryKey: ["completeness-profile", user?.id],
@@ -105,7 +106,7 @@ export function useProfileCompleteness(forRole?: AppRole): ProfileCompleteness {
       const { data } = await supabase.from("company_profiles").select("*").eq("user_id", user!.id).maybeSingle();
       return data;
     },
-    enabled: !!user && targetRole === "company",
+    enabled: !!user && targetAccountType === "company",
     staleTime: 60_000,
   });
 
@@ -115,7 +116,7 @@ export function useProfileCompleteness(forRole?: AppRole): ProfileCompleteness {
       const { data } = await supabase.from("consulting_experts").select("*").eq("user_id", user!.id).maybeSingle();
       return data;
     },
-    enabled: !!user && targetRole === "expert",
+    enabled: !!user && targetAccountType === "expert",
     staleTime: 60_000,
   });
 
@@ -142,21 +143,21 @@ export function useProfileCompleteness(forRole?: AppRole): ProfileCompleteness {
         .eq("instructor_id", user!.id);
       return count ?? 0;
     },
-    enabled: !!user && targetRole === "instructor",
+    enabled: !!user && targetAccountType === "instructor",
     staleTime: 60_000,
   });
 
   const loading =
     authLoading ||
     pLoading ||
-    (targetRole === "company" && cLoading) ||
-    (targetRole === "expert" && eLoading);
+    (targetAccountType === "company" && cLoading) ||
+    (targetAccountType === "expert" && eLoading);
 
   if (loading || !profile) {
     return { score: 0, total: 100, percentage: 0, missingFields: [], nextStep: null, loading: true };
   }
 
-  if (targetRole === "admin") {
+  if (targetAccountType === "admin") {
     return { score: 100, total: 100, percentage: 100, missingFields: [], nextStep: null, loading: false };
   }
 
@@ -168,7 +169,7 @@ export function useProfileCompleteness(forRole?: AppRole): ProfileCompleteness {
     else missing.push({ label, pts });
   };
 
-  switch (targetRole) {
+  switch (targetAccountType) {
     case "company": {
       check(has(company?.company_name), l.company_name, 15);
       check(has(company?.logo_url), l.logo_url, 15);

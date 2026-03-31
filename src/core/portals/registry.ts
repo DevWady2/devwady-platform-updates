@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Globe, Rocket, Users, MessageSquareMore, GraduationCap, ShieldCheck,
 } from "lucide-react";
-import type { PortalId, AccountType, AppRole } from "@/core/types";
+import type { PortalId, AccountType, AppRole, Capability } from "@/core/types";
 
 export interface PortalConfig {
   id: PortalId;
@@ -18,6 +18,8 @@ export interface PortalConfig {
   icon: LucideIcon;
   /** Canonical account types that can access this portal (empty = public) */
   allowedAccountTypes: AccountType[];
+  /** Optional capability hints for transition-safe access checks */
+  allowedCapabilities?: Capability[];
   /** @deprecated Legacy alias — kept for untouched guard consumers */
   allowedRoles: AppRole[];
   /** Whether the portal requires authentication */
@@ -36,6 +38,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "الموقع العام الرئيسي",
     icon: Globe,
     allowedAccountTypes: [],
+    allowedCapabilities: [],
     allowedRoles: [],
     requiresAuth: false,
     accentGradient: "from-primary to-secondary",
@@ -49,6 +52,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "المشاريع والأنظمة والتسليم",
     icon: Rocket,
     allowedAccountTypes: ["company", "admin"],
+    allowedCapabilities: [],
     allowedRoles: ["company", "admin"],
     requiresAuth: true,
     accentGradient: "from-[#7D33FF] to-[#956EFA]",
@@ -62,6 +66,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "التوظيف والتعهيد والمواهب",
     icon: Users,
     allowedAccountTypes: ["company", "freelancer", "admin"],
+    allowedCapabilities: [],
     allowedRoles: ["company", "individual", "admin"],
     requiresAuth: true,
     accentGradient: "from-[#185FA5] to-[#378ADD]",
@@ -75,6 +80,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "جلسات استشارية مع الخبراء",
     icon: MessageSquareMore,
     allowedAccountTypes: ["freelancer", "company", "expert", "admin"],
+    allowedCapabilities: [],
     allowedRoles: ["individual", "company", "expert", "admin"],
     requiresAuth: true,
     accentGradient: "from-[#7D33FF] to-[#3333FF]",
@@ -88,6 +94,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "تعلم الطلاب والدورات",
     icon: GraduationCap,
     allowedAccountTypes: ["student", "admin"],
+    allowedCapabilities: [],
     allowedRoles: ["student", "admin"],
     requiresAuth: true,
     accentGradient: "from-[#0F6E56] to-[#1D9E75]",
@@ -101,6 +108,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "إنشاء الدورات وإدارة التدريس",
     icon: GraduationCap,
     allowedAccountTypes: ["instructor", "admin"],
+    allowedCapabilities: ["create_courses"],
     allowedRoles: ["instructor", "admin"],
     requiresAuth: true,
     accentGradient: "from-[#0F6E56] to-[#1D9E75]",
@@ -114,6 +122,7 @@ export const PORTALS: Record<PortalId, PortalConfig> = {
     description_ar: "الإدارة الداخلية",
     icon: ShieldCheck,
     allowedAccountTypes: ["admin"],
+    allowedCapabilities: ["admin_backoffice"],
     allowedRoles: ["admin"],
     requiresAuth: true,
     accentGradient: "from-rose-600 to-pink-500",
@@ -128,4 +137,37 @@ export function getPortalByPath(path: string): PortalConfig | undefined {
   return PORTAL_LIST.find(
     (p) => p.basePath !== "/" && path.startsWith(p.basePath)
   );
+}
+
+
+export interface PortalAccessSubject {
+  accountType?: AccountType | null;
+  capabilities?: Capability[];
+  role?: AppRole | null;
+}
+
+/**
+ * Canonical-first portal access check.
+ * Prefer accountType, optionally allow capability-based access for portals that define it,
+ * and only fall back to the legacy role shim when canonical identity is unavailable.
+ */
+export function canAccessPortal(portal: PortalConfig, subject: PortalAccessSubject): boolean {
+  if (!portal.requiresAuth) return true;
+
+  const { accountType = null, capabilities = [], role = null } = subject;
+
+  if (accountType && portal.allowedAccountTypes.includes(accountType)) {
+    return true;
+  }
+
+  if (portal.allowedCapabilities?.length) {
+    const hasCapabilityAccess = portal.allowedCapabilities.some((cap) => capabilities.includes(cap));
+    if (hasCapabilityAccess) return true;
+  }
+
+  if (!accountType && role && portal.allowedRoles.includes(role)) {
+    return true;
+  }
+
+  return false;
 }

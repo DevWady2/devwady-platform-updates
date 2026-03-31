@@ -99,7 +99,7 @@ export default function AcademyLanding() {
               </motion.h2>
             </div>
             <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-              {/* For Individual Learners */}
+              {/* For Freelancers & independent learners */}
               <motion.div variants={fadeUp} custom={0} initial="hidden" whileInView="visible" viewport={{ once: true }}
                 className="bg-card border border-border rounded-2xl p-8 hover:border-[#0F6E56]/30 transition-colors group"
               >
@@ -107,7 +107,7 @@ export default function AcademyLanding() {
                   <GraduationCap className="h-6 w-6" style={{ color: "#0F6E56" }} />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-2">
-                  {isAr ? "للمتعلمين الأفراد" : "For Individual Learners"}
+                  {isAr ? "للمستقلين والمتعلمين الأفراد" : "For Freelancers & Independent Learners"}
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed mb-6">
                   {isAr
