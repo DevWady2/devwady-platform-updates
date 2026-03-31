@@ -1,64 +1,44 @@
 
 
-## LP-24 — Sample-Data Fallback Normalization (Revised)
+## Problem
 
-### Summary
-Centralize page-local mock arrays, normalize all dialog fallback gating via explicit `isSampleContext` props, and add truthful labeling where missing.
+The `public/` directory contains a full duplicate of the project (likely from the remix process). It includes:
+- `public/src/` — duplicate source code with diverged files
+- `public/package.json`, `public/vite.config.ts` — duplicate configs
+- `public/.env` — with **different** Supabase credentials (pointing to old project)
+- `public/bun.lock`, `public/tsconfig.json`, etc.
 
-### Changes
+The actual static assets (favicon, fonts, og-image, etc.) are nested inside `public/public/`.
 
-**A. `src/data/mockData.ts` — Add centralized mock exports**
-Move the 4 page-local arrays from InstructorStudents.tsx into centralized exports:
-- `MOCK_STUDENT_ENROLLMENTS`, `MOCK_STUDENT_PROFILES`, `MOCK_STUDENT_PROGRESS`, `MOCK_STUDENT_COURSE`
+**Note:** The preview currently appears functional — network requests succeed and no runtime errors are detected. If you're seeing a specific error, please describe it so I can target the exact issue.
 
-**B. `src/pages/instructor/InstructorStudents.tsx`**
-- Delete local `MOCK_ENROLLMENTS`, `MOCK_PROFILES`, `MOCK_PROGRESS`, `MOCK_COURSE` arrays
-- Import centralized versions from `@/data/mockData`
-- No logic changes — existing `isSampleCourse` gating and `SampleDataBadge` already correct
+## Plan
 
-**C. `src/components/instructor/NominateStudentDialog.tsx`**
-- Add `isSampleContext?: boolean` prop (default `false`)
-- Replace `isSampleMode()` with `isSampleContext` for student list gating
-- Remove direct `isSampleMode` import
+### Step 1 — Move real static assets up
+Move the legitimate static assets from `public/public/` (fonts, favicon.ico, manifest.json, og-image.png, placeholder.svg, robots.txt, sitemap.xml) to `public/`.
 
-**D. `src/components/instructor/InviteAssistantDialog.tsx` ← REQUIRED CORRECTION**
-- Add `isSampleContext?: boolean` prop (default `false`)
-- Replace all 4 raw `isSampleMode()` calls (lines 140, 156, 167, 201) with `isSampleContext`
-- Remove direct `isSampleMode` import
-- This dialog is opened from two parents:
-  - `InstructorCourseDetail.tsx` — has `isSampleCourse` already, will pass it
-  - `InstructorAssistants.tsx` — real-data page, will pass `false` (default)
+### Step 2 — Delete duplicate project files from `public/`
+Remove all non-static-asset files and directories from `public/`:
+- `public/src/`
+- `public/supabase/`
+- `public/.lovable/`
+- `public/package.json`, `public/package-lock.json`
+- `public/vite.config.ts`, `public/vitest.config.ts`
+- `public/tsconfig.json`, `public/tsconfig.app.json`, `public/tsconfig.node.json`
+- `public/tailwind.config.ts`, `public/postcss.config.js`
+- `public/eslint.config.js`, `public/components.json`
+- `public/.env`, `public/.gitignore`, `public/.gitattributes`
+- `public/bun.lock`, `public/bun.lockb`
+- `public/index.html`, `public/README.md`
+- `public/.prewarm`, `public/playwright-fixture.ts`, `public/playwright.config.ts`
+- `public/public/` (after assets moved)
 
-**E. `src/pages/instructor/InstructorCourseDetail.tsx` — Update dialog props**
-- Pass `isSampleContext={isSampleCourse}` to both `NominateStudentDialog` and `InviteAssistantDialog`
+### Step 3 — Verify build
+Confirm the app builds and renders correctly with the cleaned `public/` directory.
 
-**F. `src/pages/instructor/InstructorJobs.tsx`**
-- Track whether displayed jobs came from mock fallback
-- Show `SampleDataBadge` in page header when sample jobs are active
-
-**G. No changes to:**
-- `InstructorCourses.tsx` — already correct
-- `InstructorAssistants.tsx` — real-data page, default `isSampleContext=false` is correct
-
-### Gating logic summary
-
-| Surface | Gate | Badge |
-|---------|------|-------|
-| InstructorCourses | `withSampleFallback()` | Yes (existing) |
-| InstructorCourseDetail | `isSampleCourse` (mock-prefix) | Yes (existing) |
-| InstructorStudents | `isSampleCourse` (mock-prefix) | Yes (existing) |
-| InstructorJobs | `isSampleMode()` + empty real data | Yes (adding) |
-| NominateStudentDialog | `isSampleContext` prop from parent | Parent badge covers |
-| InviteAssistantDialog | `isSampleContext` prop from parent | Parent badge covers |
-
-### Files changed (7)
-1. `src/data/mockData.ts`
-2. `src/pages/instructor/InstructorStudents.tsx`
-3. `src/components/instructor/NominateStudentDialog.tsx`
-4. `src/components/instructor/InviteAssistantDialog.tsx`
-5. `src/pages/instructor/InstructorCourseDetail.tsx`
-6. `src/pages/instructor/InstructorJobs.tsx`
-
-### Build
-Run standard production build (`npm run build`) and stop.
+## Technical details
+- Vite serves everything in `public/` as static assets at the root URL
+- The duplicate `.env` has credentials for a different backend project, which could cause subtle issues if accidentally imported
+- The duplicate `vite.config.ts` in `public/` is inert but adds confusion
+- ~50+ files will be removed; no functional code changes needed
 
