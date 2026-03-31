@@ -9,10 +9,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 let mockAccountType: "freelancer" | "instructor" = "freelancer";
 let mockRole: "individual" | "instructor" = "individual";
 let mockRoles: string[] = ["individual"];
-const mockSwitchRole = vi.fn(async () => {
+const mockSwitchRole = vi.fn(async (_role?: string) => {
   throw new Error("Role switching is disabled. The platform now uses a single canonical account model.");
 });
-const mockAddRole = vi.fn(async () => ({
+const mockAddRole = vi.fn(async (_role?: string) => ({
   error: new Error("Adding roles is disabled. The platform now uses a single canonical account model."),
 }));
 
