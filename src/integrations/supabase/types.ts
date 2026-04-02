@@ -14,48 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      account_type_migration_reviews: {
-        Row: {
-          created_at: string
-          detected_account_types: string[]
-          detected_roles: Database["public"]["Enums"]["app_role"][]
-          id: string
-          proposed_account_type: string | null
-          resolution_notes: string | null
-          resolved_at: string | null
-          resolved_by: string | null
-          review_reason: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          detected_account_types?: string[]
-          detected_roles?: Database["public"]["Enums"]["app_role"][]
-          id?: string
-          proposed_account_type?: string | null
-          resolution_notes?: string | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          review_reason: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          detected_account_types?: string[]
-          detected_roles?: Database["public"]["Enums"]["app_role"][]
-          id?: string
-          proposed_account_type?: string | null
-          resolution_notes?: string | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          review_reason?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       academy_nominations: {
         Row: {
           cohort_id: string | null
@@ -2348,12 +2306,12 @@ export type Database = {
           account_type: string | null
           approval_status: string | null
           avatar_url: string | null
-          badges: Json | null
+          badges: string[] | null
           batch: string | null
           bio: string | null
-          capabilities: string[]
+          capabilities: string[] | null
           created_at: string
-          entitlements: Json | null
+          entitlements: string[] | null
           full_name: string | null
           github_url: string | null
           hourly_rate: string | null
@@ -2380,12 +2338,12 @@ export type Database = {
           account_type?: string | null
           approval_status?: string | null
           avatar_url?: string | null
-          badges?: Json | null
+          badges?: string[] | null
           batch?: string | null
           bio?: string | null
-          capabilities?: string[]
+          capabilities?: string[] | null
           created_at?: string
-          entitlements?: Json | null
+          entitlements?: string[] | null
           full_name?: string | null
           github_url?: string | null
           hourly_rate?: string | null
@@ -2412,12 +2370,12 @@ export type Database = {
           account_type?: string | null
           approval_status?: string | null
           avatar_url?: string | null
-          badges?: Json | null
+          badges?: string[] | null
           batch?: string | null
           bio?: string | null
-          capabilities?: string[]
+          capabilities?: string[] | null
           created_at?: string
-          entitlements?: Json | null
+          entitlements?: string[] | null
           full_name?: string | null
           github_url?: string | null
           hourly_rate?: string | null
@@ -3375,14 +3333,6 @@ export type Database = {
           full_name: string
           user_id: string
         }[]
-      }
-      has_account_type: {
-        Args: { _account_type: string; _user_id: string }
-        Returns: boolean
-      }
-      has_capability: {
-        Args: { _capability: string; _user_id: string }
-        Returns: boolean
       }
       has_role: {
         Args: {
