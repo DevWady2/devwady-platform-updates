@@ -70,7 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        setTimeout(() => fetchRoleAndStatus(session.user.id), 0);
+        setTimeout(() => {
+          void fetchRoleAndStatus(session.user);
+        }, 0);
       } else {
         setAccountType(null);
         setCapabilities([]);
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        await fetchRoleAndStatus(session.user.id);
+        await fetchRoleAndStatus(session.user);
       }
       setLoading(false);
     });
@@ -93,12 +95,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchRoleAndStatus = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_status, account_type, capabilities, approval_status, badges, entitlements")
-      .eq("user_id", userId)
-      .maybeSingle();
+  const fetchRoleAndStatus = async (authUser: User) => {
+    const selection = "account_status, account_type, capabilities, approval_status, badges, entitlements";
+
+    const readProfile = async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(selection)
+        .eq("user_id", authUser.id)
+        .maybeSingle();
+
+      return { data, error };
+    };
+
+    let { data: profile } = await readProfile();
+
+    if (!profile) {
+      const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
+      const fallbackAccountType = normalizeAccountType(
+        typeof metadata.account_type === "string" ? metadata.account_type : null,
+      );
+      const fallbackFullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+      const fallbackCapabilities = fallbackAccountType ? (DEFAULT_CAPABILITIES[fallbackAccountType] ?? []) : [];
+
+      const { error: insertError } = await supabase.from("profiles").insert({
+        user_id: authUser.id,
+        full_name: fallbackFullName || null,
+        account_type: fallbackAccountType,
+        account_status: "active",
+        capabilities: fallbackCapabilities,
+      });
+
+      if (!insertError) {
+        const retry = await readProfile();
+        profile = retry.data;
+      }
+    }
 
     const canonicalAccountType = normalizeAccountType(profile?.account_type);
     const status = (profile?.account_status as AccountStatus) ?? "active";

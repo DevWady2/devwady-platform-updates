@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -150,24 +151,35 @@ export default function ProfileEdit() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({
+    const { error } = await saveProfileByUserId(user.id, {
       full_name: form.full_name, bio: form.bio, phone: form.phone,
       location: form.location, skills: form.skills, hourly_rate: form.hourly_rate,
       portfolio_url: form.portfolio_url, linkedin_url: form.linkedin_url,
       github_url: form.github_url, avatar_url: form.avatar_url,
       is_available: form.is_available,
-    }).eq("user_id", user.id);
+    });
 
     if (error) { toast.error(tt(lang, "Failed to save", "حدث خطأ")); setSaving(false); return; }
 
     if (accountType === "company") {
-      const { error: cErr } = await supabase.from("company_profiles").update({
+      const companyPayload = {
         company_name: comp.company_name, industry: comp.industry || null,
         employee_count: comp.employee_count || null, website: comp.website || null,
         description: comp.description || null, location: comp.location || null,
         founded_year: comp.founded_year ? parseInt(comp.founded_year) : null,
         logo_url: comp.logo_url || null,
-      }).eq("user_id", user.id);
+      };
+
+      const { data: existingCompany } = await supabase
+        .from("company_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const { error: cErr } = existingCompany?.id
+        ? await supabase.from("company_profiles").update(companyPayload).eq("id", existingCompany.id)
+        : await supabase.from("company_profiles").insert({ user_id: user.id, ...companyPayload });
+
       if (cErr) { toast.error(tt(lang, "Failed to save company", "فشل حفظ بيانات الشركة")); setSaving(false); return; }
     }
 

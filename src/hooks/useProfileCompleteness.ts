@@ -153,13 +153,18 @@ export function useProfileCompleteness(forAccountType?: CompletenessTarget): Pro
     (targetAccountType === "company" && cLoading) ||
     (targetAccountType === "expert" && eLoading);
 
-  if (loading || !profile) {
+  if (loading) {
     return { score: 0, total: 100, percentage: 0, missingFields: [], nextStep: null, loading: true };
   }
 
   if (targetAccountType === "admin") {
     return { score: 100, total: 100, percentage: 100, missingFields: [], nextStep: null, loading: false };
   }
+
+  if (!profile) {
+    return { score: 0, total: 100, percentage: 0, missingFields: [], nextStep: null, loading: false };
+  }
+
 
   const missing: { label: string; pts: number }[] = [];
   let score = 0;

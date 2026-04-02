@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -118,13 +119,13 @@ export default function StudentOnboarding() {
   const handleSaveStep1 = async () => {
     if (!user || !fullName.trim()) return;
     setSaving(true);
-    await supabase.from("profiles").update({
+    await saveProfileByUserId(user.id, {
       full_name: fullName.trim(),
       avatar_url: avatarUrl || null,
       location: location || null,
       phone: phone || null,
       bio: bio || null,
-    }).eq("user_id", user.id);
+    });
     setSaving(false);
     goTo(1);
   };
@@ -136,7 +137,7 @@ export default function StudentOnboarding() {
     if (interests.length) updates.skills = interests;
     if (interests.length === 1) updates.track = interests[0];
     if (Object.keys(updates).length) {
-      await supabase.from("profiles").update(updates).eq("user_id", user.id);
+      await saveProfileByUserId(user.id, updates);
     }
     setSaving(false);
     goTo(2);
