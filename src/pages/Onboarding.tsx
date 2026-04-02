@@ -4,6 +4,7 @@ import type { AccountType } from "@/core/types";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -147,14 +148,14 @@ export default function Onboarding() {
   const handleFinish = async () => {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({
+    const { error } = await saveProfileByUserId(user.id, {
       full_name: fullName.trim(),
       phone: phone || null,
       location: location || null,
       bio: bio || null,
       track: track || null,
       avatar_url: avatarUrl || null,
-    }).eq("user_id", user.id);
+    });
     setSaving(false);
     if (error) {
       toast.error(isAr ? "حدث خطأ" : "Failed to save profile");

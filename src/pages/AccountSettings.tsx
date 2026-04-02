@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { useToast } from "@/hooks/use-toast";
 import SEO from "@/components/SEO";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,7 +114,7 @@ export default function AccountSettings() {
   const handleDeactivate = async () => {
     if (deactivateConfirm !== "DEACTIVATE") return;
     setDeactivateLoading(true);
-    await supabase.from("profiles").update({ account_status: "deactivated" }).eq("user_id", user!.id);
+    await saveProfileByUserId(user!.id, { account_status: "deactivated" });
     setDeactivateLoading(false);
     await signOut();
     navigate("/", { replace: true });

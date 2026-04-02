@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -126,12 +127,12 @@ export default function FreelancerSignupForm({ onBack }: Props) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       if (!skipProfile && (track || skills.length || location || hourlyRate)) {
-        await supabase.from("profiles").update({
+        await saveProfileByUserId(user.id, {
           track: track || null,
           skills: skills.length ? skills : null,
           location: location || null,
           hourly_rate: hourlyRate || null,
-        }).eq("user_id", user.id);
+        });
       }
 
       // role-specific welcome email (fire-and-forget)

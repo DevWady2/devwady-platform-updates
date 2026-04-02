@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -173,14 +174,14 @@ export default function ExpertSignupForm({ onBack, redirect: _redirect = "" }: P
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       // Store application in profiles metadata
-      await supabase.from("profiles").update({
+      await saveProfileByUserId(user.id, {
         bio: bio.trim().slice(0, 1000),
         headline: title.trim().slice(0, 120),
         linkedin_url: linkedinUrl.trim().slice(0, 500) || null,
         portfolio_url: portfolioUrl.trim().slice(0, 500) || null,
         website: websiteUrl.trim().slice(0, 500) || null,
         account_status: "pending_approval",
-      }).eq("user_id", user.id);
+      });
 
       // Notify admins
       supabase.from("profiles").select("user_id").eq("account_type", "admin")

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -109,7 +110,7 @@ export default function StudentSignupForm({ onBack, redirect: _redirect = "" }: 
         const updates: Record<string, any> = {};
         if (selectedInterests.length) updates.skills = selectedInterests;
         if (selectedInterests.length === 1) updates.track = selectedInterests[0];
-        await supabase.from("profiles").update(updates).eq("user_id", user.id);
+        await saveProfileByUserId(user.id, updates);
       }
       supabase.functions.invoke("send-email", {
         body: { to: email, template: "welcome_student", data: { name: fullName, lang } },

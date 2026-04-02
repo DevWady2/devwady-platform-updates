@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SEO from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,7 +92,7 @@ export default function FreelancerOnboarding() {
   const handleFinish = async () => {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({
+    const { error } = await saveProfileByUserId(user.id, {
       full_name: fullName.trim(),
       phone, location, bio,
       track, skills,
@@ -100,7 +101,7 @@ export default function FreelancerOnboarding() {
       linkedin_url: linkedinUrl || null,
       github_url: githubUrl || null,
       avatar_url: avatarUrl || null,
-    }).eq("user_id", user.id);
+    });
     setSaving(false);
     if (error) {
       toast.error(isAr ? "حدث خطأ" : "Failed to save profile");

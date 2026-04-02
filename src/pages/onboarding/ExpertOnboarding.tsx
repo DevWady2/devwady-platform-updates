@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { saveProfileByUserId } from "@/lib/profilePersistence";
 import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,7 +155,7 @@ export default function ExpertOnboarding() {
 
     // Also update profile avatar if set
     if (avatarUrl) {
-      await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", user!.id);
+      await saveProfileByUserId(user!.id, { avatar_url: avatarUrl });
     }
 
     qc.invalidateQueries({ queryKey: ["expert-onboarding"] });
@@ -226,8 +227,8 @@ export default function ExpertOnboarding() {
     if (error) { toast.error(error.message); return; }
 
     // Update profile completeness so redirect won't loop
-    await supabase.from("profiles").update({ bio: bio.trim() || "Expert" }).eq("user_id", user!.id);
-    qc.invalidateQueries({ queryKey: ["profile-completeness"] });
+    await saveProfileByUserId(user!.id, { bio: bio.trim() || "Expert" });
+    qc.invalidateQueries({ queryKey: ["completeness-profile"] });
     setStep(3);
   };
 
