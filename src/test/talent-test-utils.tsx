@@ -56,7 +56,7 @@ vi.mock("@/core/components", () => ({
     </div>
   ),
   ActivityFeed: () => <div data-testid="activity-feed">Activity feed</div>,
-  FocusBlock: ({ title_en, title_ar, action_en, action_ar, actionHref, subtitle_en, subtitle_ar, label_en, label_ar }: any) => (
+  FocusBlock: ({ title_en, title_ar, action_en, action_ar, actionHref, subtitle_en, subtitle_ar, label_en: _le, label_ar: _la }: any) => (
     <div data-testid="focus-block">
       <span>{title_en ?? title_ar}</span>
       {(subtitle_en || subtitle_ar) && <p>{subtitle_en ?? subtitle_ar}</p>}
