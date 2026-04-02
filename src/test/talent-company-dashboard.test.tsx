@@ -31,8 +31,9 @@ describe("TalentCompanyDashboard", () => {
     expect(screen.getByText("Senior Backend Engineer")).toBeInTheDocument();
     expect(screen.getByText("Recent Applications")).toBeInTheDocument();
     expect(screen.getByText("candidate@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Hire Requests")).toBeInTheDocument();
-    expect(screen.getByText("Mobile Squad")).toBeInTheDocument();
+    expect(screen.getByText("Open Positions")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Review Applicants/i })).toHaveAttribute("href", "/talent/portal/company/applications");
+    expect(screen.getByTestId("activity-feed")).toBeInTheDocument();
   });
 
   it("shows the empty job state when no active jobs exist", () => {

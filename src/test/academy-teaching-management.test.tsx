@@ -18,6 +18,7 @@ vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: vi.fn() }));
 vi.mock("@/portals/academy/hooks/useInstructorCourses", () => ({ useInstructorCourses: vi.fn() }));
 vi.mock("@/portals/academy/hooks/useStudentEnrollments", () => ({ useStudentEnrollments: vi.fn() }));
 vi.mock("@/core/hooks", () => ({ useSearch: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn(), useMutation: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn() } }));
 vi.mock("@/lib/csvExport", () => ({ downloadCSV: (...args: any[]) => (vi as any).__downloadCSV?.(...args) }));
 

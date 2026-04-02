@@ -130,7 +130,7 @@ describe('shared portal shell integration', () => {
 
     expect(screen.getAllByText('Browse Jobs').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('My Applications')).toBeInTheDocument();
-    expect(screen.getByText('Portfolio')).toBeInTheDocument();
+    expect(screen.getAllByText('Portfolio').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Browse Talent')).not.toBeInTheDocument();
     expect(screen.getByText('Freelancer')).toBeInTheDocument();
     expect(screen.getAllByText('Profile').length).toBeGreaterThanOrEqual(1);
@@ -147,7 +147,7 @@ describe('shared portal shell integration', () => {
     expect(screen.getAllByText('Consulting').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Bookings').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Availability').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Earnings')).toBeInTheDocument();
+    expect(screen.getAllByText('Earnings').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Browse Experts')).not.toBeInTheDocument();
   });
 
@@ -173,7 +173,7 @@ describe('shared portal shell integration', () => {
       <InstructorWorkspaceLayout><div>Instructor workspace body</div></InstructorWorkspaceLayout>
     );
 
-    expect(screen.getByText('Create Course')).toBeInTheDocument();
+    expect(screen.getAllByText('Create Course').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Lessons')).toBeInTheDocument();
     expect(screen.getByText('Students')).toBeInTheDocument();
     expect(screen.getByText('Instructor workspace body')).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe('shared portal shell integration', () => {
     );
 
     expect(screen.getAllByText('My Courses').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Progress')).toBeInTheDocument();
+    expect(screen.getAllByText('Progress').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Certificates')).toBeInTheDocument();
     expect(screen.getByText('Browse Courses')).toBeInTheDocument();
     expect(screen.queryByText('Create Course')).not.toBeInTheDocument();

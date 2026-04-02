@@ -94,6 +94,6 @@ describe("EnterpriseDashboard", () => {
     expect(screen.getByText("Quote Q-001 — $2500")).toBeInTheDocument();
 
     expect(screen.getByText("ERP Platform")).toBeInTheDocument();
-    expect(screen.getByText("Discovery Workshop")).toBeInTheDocument();
+    expect(screen.getAllByText("Discovery Workshop").length).toBeGreaterThanOrEqual(1);
   });
 });

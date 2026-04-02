@@ -97,7 +97,7 @@ describe("BackofficeDashboard", () => {
     expect(screen.getByRole("link", { name: /View All/i })).toHaveAttribute("href", "/admin/service-requests");
     expect(screen.getByTestId("activity-feed")).toHaveTextContent("ActivityFeed 6");
     expect(screen.getByRole("link", { name: /Projects/i })).toHaveAttribute("href", "/admin/projects");
-    expect(screen.getByRole("link", { name: /Bookings/i })).toHaveAttribute("href", "/admin/bookings");
+    expect(screen.getByRole("link", { name: /^Bookings$/i })).toHaveAttribute("href", "/admin/bookings");
     expect(screen.getByRole("link", { name: /Courses/i })).toHaveAttribute("href", "/admin/training");
     expect(screen.getByRole("link", { name: /Users/i })).toHaveAttribute("href", "/admin/users");
   });

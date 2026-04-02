@@ -6,7 +6,7 @@ import { mockUseAuth, renderAtPath, resetAcademyTestMocks, setAcademyQueryMap } 
 vi.mock("@/core/hooks", () => ({ useSearch: vi.fn() }));
 vi.mock("@/portals/academy/hooks/useStudentEnrollments", () => ({ useStudentEnrollments: vi.fn() }));
 vi.mock("@/portals/academy/hooks/useInstructorCourses", () => ({ useInstructorCourses: vi.fn() }));
-vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn(), useMutation: vi.fn(() => ({ mutateAsync: vi.fn() })) }));
+vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn(), useMutation: vi.fn() }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: vi.fn() }));
 vi.mock("@/contexts/LanguageContext", () => ({ useLanguage: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn() } }));

@@ -81,8 +81,8 @@ describe("ConsultingExpertDashboard", () => {
 
     mockUseQuery.mockReturnValue({
       data: [
-        { id: "b1", guest_name: "Acme", booking_date: "2026-03-26", start_time: "10:00:00", end_time: "11:00:00", status: "pending", payment_status: "paid", amount_usd: 120, created_at: "2026-03-25T00:00:00Z" },
-        { id: "b2", guest_name: "Beta", booking_date: "2026-03-28", start_time: "12:00:00", end_time: "13:00:00", status: "confirmed", payment_status: "paid", amount_usd: 120, created_at: "2026-03-24T00:00:00Z", meeting_url: "https://meet.devwady.test" },
+        { id: "b1", guest_name: "Acme", booking_date: "2026-04-26", start_time: "10:00:00", end_time: "11:00:00", status: "pending", payment_status: "paid", amount_usd: 120, created_at: "2026-04-25T00:00:00Z" },
+        { id: "b2", guest_name: "Beta", booking_date: "2026-04-28", start_time: "12:00:00", end_time: "13:00:00", status: "confirmed", payment_status: "paid", amount_usd: 120, created_at: "2026-04-24T00:00:00Z", meeting_url: "https://meet.devwady.test" },
         { id: "b3", guest_name: "Gamma", booking_date: "2026-03-10", start_time: "14:00:00", end_time: "15:00:00", status: "completed", payment_status: "paid", amount_usd: 140, rating: 5, created_at: "2026-03-10T00:00:00Z" },
       ],
       isLoading: false,
